@@ -5,7 +5,8 @@ Habit observes how you work, captures your repeated patterns into structured pro
 ## Install
 
 ```
-/plugin install habit@claude-plugins-official
+/plugin marketplace add https://github.com/Prog-Jacob/habit.git
+/plugin install habit@habit
 ```
 
 Storage is created automatically on first use.

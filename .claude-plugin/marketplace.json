@@ -1,0 +1,12 @@
+{
+  "name": "habit",
+  "owner": {
+    "name": "Prog-Jacob"
+  },
+  "plugins": [
+    {
+      "name": "habit",
+      "source": "./"
+    }
+  ]
+}
