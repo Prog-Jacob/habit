@@ -8,11 +8,15 @@ allowed-tools: Read Write Edit
 
 # /habit:distill: Sweep & Restructure
 
-Runs in forked subagent.
+Runs in forked subagent. User prompts from this session are pre-loaded below.
+
+## User prompts from this session
+
+!`cat "$(cat /tmp/habit-transcript-${CLAUDE_SESSION_ID} 2>/dev/null)" 2>/dev/null | jq -r 'select(.type=="user") | .message.content | if type == "string" then . elif type == "array" then map(select(.type=="text") | .text) | join("\n") else empty end' 2>/dev/null || echo "No session data yet."`
 
 ## Regular (no arguments)
 
-1. Read the transcript path from `/tmp/habit-transcript-${CLAUDE_SESSION_ID}` (one line, written by the hook), then read that file. If the file doesn't exist, tell the user "No session data yet, send a message first, then retry." Only extract user messages (skip assistant responses, tool calls, system messages). Classify each: reusable if it describes a generalizable workflow or constraint (even if used only once), one-off if it's a question or specific debugging.
+1. Classify each user prompt above: reusable if it describes a generalizable workflow or constraint (even if used only once), one-off if it's a question or specific debugging.
 2. Load merged index from both scopes.
 3. Read `${CLAUDE_SKILL_DIR}/../habit-shared/PROCESSING.md`. Apply rules for interpretation, dedup, structuring.
 4. Read `_log.jsonl` to detect override patterns (3+ similar on same habit).
