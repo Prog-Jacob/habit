@@ -10,6 +10,10 @@ INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // ""')
 [ -z "$SESSION_ID" ] && exit 0
 
+# Store transcript path for skills to read (runs on every prompt, not just when watching)
+TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // ""')
+[ -n "$TRANSCRIPT" ] && echo "$TRANSCRIPT" > "/tmp/habit-transcript-$SESSION_ID"
+
 SENTINEL="/tmp/habit-watch-active-$SESSION_ID"
 
 # Fast path: not watching, exit silently

@@ -12,7 +12,7 @@ Runs in forked subagent.
 
 ## Regular (no arguments)
 
-1. Read `$TRANSCRIPT_PATH`, only extract user messages (skip assistant responses, tool calls, system messages). Classify each: reusable if it describes a generalizable workflow or constraint (even if used only once), one-off if it's a question or specific debugging.
+1. Read the transcript path from `/tmp/habit-transcript-${CLAUDE_SESSION_ID}` (one line, written by the hook), then read that file. If the file doesn't exist, tell the user "No session data yet, send a message first, then retry." Only extract user messages (skip assistant responses, tool calls, system messages). Classify each: reusable if it describes a generalizable workflow or constraint (even if used only once), one-off if it's a question or specific debugging.
 2. Load merged index from both scopes.
 3. Read `${CLAUDE_SKILL_DIR}/../habit-shared/PROCESSING.md`. Apply rules for interpretation, dedup, structuring.
 4. Read `_log.jsonl` to detect override patterns (3+ similar on same habit).

@@ -18,7 +18,7 @@ allowed-tools: Read Write Bash
 
 1. `/tmp/habit-watch-active-${CLAUDE_SESSION_ID}` exists → "Already watching." and stop.
 2. Create sentinel. Initialize queue.
-3. Sweep session: read `$TRANSCRIPT_PATH`, only extract user messages (skip assistant responses, tool calls, system messages). Classify each: reusable if it describes a generalizable workflow or constraint (even if used only once), one-off if it's a question or specific debugging. Apply PROCESSING.md rules for reusable candidates.
+3. Sweep session: read the transcript path from `/tmp/habit-transcript-${CLAUDE_SESSION_ID}` (one line, written by the hook), then read that file. If the file doesn't exist, tell the user "No session data yet, send a message first, then retry." Only extract user messages (skip assistant responses, tool calls, system messages). Classify each: reusable if it describes a generalizable workflow or constraint (even if used only once), one-off if it's a question or specific debugging. Apply PROCESSING.md rules for reusable candidates.
 4. Confirm: "Watching. Swept session so far: captured N patterns." List captured habit ids and one-line descriptions, same format as deactivation summary.
 
 Hook collects subsequent prompts to queue asynchronously. Queue is processed on deactivation (`/habit:watch off`). Running `/habit:distill` separately reads the full transcript, which covers the same messages, but does not consume the queue.
