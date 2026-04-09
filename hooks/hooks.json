@@ -1,0 +1,16 @@
+{
+  "description": "Lightweight prompt collector for habit:watch. Appends user prompts to a queue file when watch is active. Never blocks.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-watch-gate.sh",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}
