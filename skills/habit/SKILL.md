@@ -20,7 +20,7 @@ This skill is the main entry point for the Habit system. Route based on what the
 
 ## Browse & Select
 
-0. **Drain watch queue** silently, per Section 6 of `${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/PROCESSING.md`.
+0. **Drain watch queue** silently, per Section 6 of `${CLAUDE_SKILL_DIR}/../habit-shared/PROCESSING.md`.
 
 1. `$ARGUMENTS` empty → list all. Non-empty → search query.
 
@@ -34,7 +34,7 @@ This skill is the main entry point for the Habit system. Route based on what the
 
    > Pick a number or name to run, add context for an override (e.g. "1 only in auth" or "fix-types in auth"), or say "edit N" to modify.
 
-6. **When user picks one:** read `${CLAUDE_PLUGIN_ROOT}/skills/run/SKILL.md` and follow its instructions to execute the selected habit.
+6. **When user picks one:** read `${CLAUDE_SKILL_DIR}/../run/SKILL.md` and follow its instructions to execute the selected habit.
 
 7. Empty inventory:
    > No habits yet. Create one with `/habit:edit <name> <description>` or start watching with `/habit:watch`.

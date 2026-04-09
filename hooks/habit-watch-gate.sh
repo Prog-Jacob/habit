@@ -21,7 +21,7 @@ PROMPT=$(echo "$INPUT" | jq -r '.prompt // ""')
 
 # Heuristic filter: skip obvious non-reusable prompts
 WORDS=$(echo "$PROMPT" | wc -w | tr -d ' ')
-[ "$WORDS" -lt 10 ] && exit 0
+[ "$WORDS" -lt 7 ] && exit 0
 
 # Passed filter, queue for processing
 printf '%s\n---HABIT_SEPARATOR---\n' "$PROMPT" >> "/tmp/habit-watch-queue-$SESSION_ID"

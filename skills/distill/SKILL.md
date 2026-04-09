@@ -14,7 +14,7 @@ Runs in forked subagent.
 
 1. Read `$TRANSCRIPT_PATH`, only extract user messages (skip assistant responses, tool calls, system messages). Classify each: reusable if it describes a generalizable workflow or constraint (even if used only once), one-off if it's a question or specific debugging.
 2. Load merged index from both scopes.
-3. Read `${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/PROCESSING.md`. Apply rules for interpretation, dedup, structuring.
+3. Read `${CLAUDE_SKILL_DIR}/../habit-shared/PROCESSING.md`. Apply rules for interpretation, dedup, structuring.
 4. Read `_log.jsonl` to detect override patterns (3+ similar on same habit).
 5. Check `_meta.json`: `update_counter >= 20` → chain to deep (continue with the deep steps below).
 6. Return a **human-friendly summary**. Focus on what changed for the user, not implementation details. Say "Merged X into Y", "Created new habit Z", "Skipped N messages (one-off)". Do not mention file names, counters, timestamps, or pruning stats.

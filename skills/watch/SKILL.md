@@ -10,7 +10,7 @@ allowed-tools: Read Write Bash
 ## Deactivate (`$ARGUMENTS` is `off`, `stop`, or `disable`)
 
 1. Remove `/tmp/habit-watch-active-${CLAUDE_SESSION_ID}`. Missing → "Watch wasn't active." and stop.
-2. Drain watch queue per Section 6 of `${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/PROCESSING.md`.
+2. Drain watch queue per Section 6 of `${CLAUDE_SKILL_DIR}/../habit-shared/PROCESSING.md`.
 3. Print summary: created N, updated M. List ids.
 4. Clean up temp files.
 

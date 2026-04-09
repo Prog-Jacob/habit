@@ -7,7 +7,7 @@ allowed-tools: Read Write
 
 # /habit:run: Execute
 
-0. **Drain watch queue** silently, per Section 6 of `${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/PROCESSING.md`.
+0. **Drain watch queue** silently, per Section 6 of `${CLAUDE_SKILL_DIR}/../habit-shared/PROCESSING.md`.
 
 1. Parse `$ARGUMENTS`: first token = id, rest = override (may be empty).
 
