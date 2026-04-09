@@ -6,16 +6,24 @@
 
 INPUT=$(cat)
 
-# Always use PPID for sentinel, matches what the skills use.
-SENTINEL="/tmp/habit-watch-active-$PPID"
+# Extract session_id from hook input, matches ${CLAUDE_SESSION_ID} in skills.
+SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // ""')
+[ -z "$SESSION_ID" ] && exit 0
+
+SENTINEL="/tmp/habit-watch-active-$SESSION_ID"
 
 # Fast path: not watching, exit silently
 [ ! -f "$SENTINEL" ] && exit 0
 
-# Watch is active, extract prompt and append to queue
-PROMPT=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('prompt',''))" 2>/dev/null)
-if [ -n "$PROMPT" ]; then
-  printf '%s\n---HABIT_SEPARATOR---\n' "$PROMPT" >> "/tmp/habit-watch-queue-$PPID"
-fi
+# Watch is active, extract prompt
+PROMPT=$(echo "$INPUT" | jq -r '.prompt // ""')
+[ -z "$PROMPT" ] && exit 0
+
+# Heuristic filter: skip obvious non-reusable prompts
+WORDS=$(echo "$PROMPT" | wc -w | tr -d ' ')
+[ "$WORDS" -lt 10 ] && exit 0
+
+# Passed filter, queue for processing
+printf '%s\n---HABIT_SEPARATOR---\n' "$PROMPT" >> "/tmp/habit-watch-queue-$SESSION_ID"
 
 exit 0

@@ -46,6 +46,15 @@ From `_log.jsonl`: group by id, collect overrides, normalize (lowercase, trim). 
 
 Create missing dirs/files as needed.
 
-## 6. Self-Healing
+## 6. Queue Drain
+
+If `/tmp/habit-watch-queue-${CLAUDE_SESSION_ID}` exists and is non-empty, process it:
+
+1. Read the file. Prompts are separated by `---HABIT_SEPARATOR---`.
+2. Classify each: reusable or one-off (same criteria as Section 1).
+3. For reusable prompts, apply interpretation, dedup, scope detection, and write sequence (Sections 1-5).
+4. Truncate the queue file after processing.
+
+## 7. Self-Healing
 
 On read: missing `_index.json` → rebuild from `.md` frontmatter. Missing `_meta.json` → create with defaults. Missing `_log.jsonl` → create empty. Orphaned index entry → remove. `.md` without entry → add. Corrupt frontmatter → skip, warn.

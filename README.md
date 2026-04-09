@@ -15,21 +15,21 @@ Storage is created automatically on first use.
 
 | Command                          | Purpose                                     |
 | -------------------------------- | ------------------------------------------- |
-| `/habit`                         | Browse, search, and select habits           |
-| `/habit-run <id> [override]`     | Execute a habit, optionally with context    |
-| `/habit-edit <id> [description]` | Create or update a habit                    |
-| `/habit-watch`                   | Start observing the session for patterns    |
-| `/habit-watch off`               | Stop observing, process captured patterns   |
-| `/habit-distill`                 | Sweep current session for reusable patterns |
-| `/habit-distill deep`            | Full inventory restructure and cleanup      |
+| `/habit:habit`                   | Browse, search, and select habits           |
+| `/habit:run <id> [override]`     | Execute a habit, optionally with context    |
+| `/habit:edit <id> [description]` | Create or update a habit                    |
+| `/habit:watch`                   | Start observing the session for patterns    |
+| `/habit:watch off`               | Stop observing, process captured patterns   |
+| `/habit:distill`                 | Sweep current session for reusable patterns |
+| `/habit:distill deep`            | Full inventory restructure and cleanup      |
 
 ## How It Works
 
-**Capture.** Create habits explicitly with `/habit-edit`, or let the system find them with `/habit-watch` and `/habit-distill`.
+**Capture.** Create habits explicitly with `/habit:edit`, or let the system find them with `/habit:watch` and `/habit:distill`.
 
-**Execute.** Run habits with `/habit-run`. Add overrides like "only in auth module" and they get woven into the instruction semantically, not appended blindly.
+**Execute.** Run habits with `/habit:run`. Add overrides like "only in auth module" and they get woven into the instruction semantically, not appended blindly.
 
-**Evolve.** Every execution with an override is a signal. When the system detects repeated overrides (3+), it creates new habit variants or updates the base habit automatically during `/habit-distill deep`.
+**Evolve.** Every execution with an override is a signal. When the system detects repeated overrides (3+), it creates new habit variants or updates the base habit automatically during `/habit:distill deep`.
 
 ## Scope
 
