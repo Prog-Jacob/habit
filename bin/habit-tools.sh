@@ -12,6 +12,10 @@ PROJECT_DIR=".claude/habits"
 STATE_FILE="settings.local.json"
 DEFAULT_STATE='{"index":[],"meta":{"version":1,"update_counter":0,"last_deep_timestamp":null},"log":[]}'
 
+# Must match the separator hardcoded in hooks/habit-watch-gate.sh
+QUEUE_SEPARATOR="---HABIT_SEPARATOR---"
+QUEUE_THRESHOLD=20
+
 # --- Helpers ---
 
 require_jq() {
@@ -90,9 +94,7 @@ build_index_entry() {
   fi
 
   local archived_val="false"
-  if [ "$fm_archived" = "true" ]; then
-    archived_val="true"
-  fi
+  [ "$fm_archived" = "true" ] && archived_val="true"
 
   jq -n \
     --arg id "$fm_id" \
@@ -180,6 +182,62 @@ cmd_read_watch_state() {
   [ -f "/tmp/habit-watch-active-$session_id" ] && echo "ACTIVE" || echo "INACTIVE"
 }
 
+cmd_watch_start() {
+  local session_id="${1:-}"
+  [ -z "$session_id" ] && { echo "Error: session id required" >&2; exit 1; }
+  touch "/tmp/habit-watch-active-$session_id"
+  touch "/tmp/habit-watch-queue-$session_id"
+  echo "OK watch started"
+}
+
+cmd_watch_stop() {
+  local session_id="${1:-}"
+  [ -z "$session_id" ] && { echo "Error: session id required" >&2; exit 1; }
+  rm -f "/tmp/habit-watch-active-$session_id"
+  echo "OK watch stopped"
+}
+
+cmd_clear_watch_queue() {
+  local session_id="${1:-}"
+  [ -z "$session_id" ] && { echo "Error: session id required" >&2; exit 1; }
+  : > "/tmp/habit-watch-queue-$session_id"
+  echo "OK queue cleared"
+}
+
+cmd_read_watch_queue() {
+  local session_id="${1:-}"
+  [ -z "$session_id" ] && { echo "No queued prompts."; exit 0; }
+  local queue="/tmp/habit-watch-queue-$session_id"
+  [ -f "$queue" ] && [ -s "$queue" ] && cat "$queue" || echo "No queued prompts."
+}
+
+cmd_check_triggers() {
+  local session_id="${1:-}"
+
+  local gc pc
+  gc=$(cmd_read_meta --scope global | jq '.update_counter // 0')
+  pc=$(cmd_read_meta --scope project | jq '.update_counter // 0')
+
+  if [ "$gc" -ge "$QUEUE_THRESHOLD" ] || [ "$pc" -ge "$QUEUE_THRESHOLD" ]; then
+    echo "TRIGGERS: deep"
+    return
+  fi
+
+  if [ -n "$session_id" ]; then
+    local queue="/tmp/habit-watch-queue-$session_id"
+    if [ -f "$queue" ] && [ -s "$queue" ]; then
+      local qc
+      qc=$(grep -c "$QUEUE_SEPARATOR" "$queue" 2>/dev/null || echo "0")
+      if [ "$qc" -ge "$QUEUE_THRESHOLD" ]; then
+        echo "TRIGGERS: distill"
+        return
+      fi
+    fi
+  fi
+
+  echo "TRIGGERS: none"
+}
+
 cmd_read_log() {
   read_state "$GLOBAL_DIR" | jq -c '.log[]' 2>/dev/null || true
   read_state "$PROJECT_DIR" | jq -c '.log[]' 2>/dev/null || true
@@ -201,9 +259,8 @@ cmd_read_transcript() {
   fi
 
   require_jq
-  # Extract user messages. The jq slurp takes all user messages, then [-30:]
-  # keeps the last 30 to cap context size in long sessions.
-  jq -s '[.[] | select(.type=="user")] | .[-30:] | .[] | .message.content | if type == "string" then . elif type == "array" then map(select(.type=="text") | .text) | join("\n") else empty end' "$transcript_path" 2>/dev/null || echo "No session data yet."
+  # Extract user messages. [-100:] caps context size in long sessions.
+  jq -s '[.[] | select(.type=="user")] | .[-100:] | .[] | .message.content | if type == "string" then . elif type == "array" then map(select(.type=="text") | .text) | join("\n") else empty end' "$transcript_path" 2>/dev/null || echo "No session data yet."
 }
 
 # --- Write Commands ---
@@ -292,7 +349,7 @@ cmd_prune_log() {
   [ -d "$dir" ] || { echo "No habits directory for scope: $scope"; exit 0; }
 
   local cutoff
-  cutoff=$(date -u -v-90d +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "90 days ago" +"%Y-%m-%dT%H:%M:%SZ")
+  cutoff=$(date -u -v-30d +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "30 days ago" +"%Y-%m-%dT%H:%M:%SZ")
 
   update_state "$dir" jq --arg cutoff "$cutoff" \
     '.log = [.log[] | select(.timestamp > $cutoff)] | .log = .log[-500:]'
@@ -338,6 +395,11 @@ case "$cmd" in
   read-meta)        cmd_read_meta "$@" ;;
   read-transcript)  cmd_read_transcript "$@" ;;
   read-watch-state) cmd_read_watch_state "$@" ;;
+  read-watch-queue) cmd_read_watch_queue "$@" ;;
+  watch-start)      cmd_watch_start "$@" ;;
+  watch-stop)       cmd_watch_stop "$@" ;;
+  clear-watch-queue) cmd_clear_watch_queue "$@" ;;
+  check-triggers)   cmd_check_triggers "$@" ;;
   read-log)         cmd_read_log "$@" ;;
   write-habit)      cmd_write_habit "$@" ;;
   log-exec)         cmd_log_exec "$@" ;;
@@ -346,7 +408,7 @@ case "$cmd" in
   prune-log)        cmd_prune_log "$@" ;;
   *)
     echo "Usage: habit-tools.sh <command> [args]" >&2
-    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-watch-state, read-log, write-habit, log-exec, self-heal, reset-meta, prune-log" >&2
+    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-watch-state, read-watch-queue, watch-start, watch-stop, clear-watch-queue, check-triggers, read-log, write-habit, log-exec, self-heal, reset-meta, prune-log" >&2
     exit 1
     ;;
 esac

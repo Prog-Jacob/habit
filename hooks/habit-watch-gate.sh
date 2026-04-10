@@ -28,6 +28,7 @@ WORDS=$(echo "$PROMPT" | wc -w | tr -d ' ')
 [ "$WORDS" -lt 7 ] && exit 0
 
 # Passed filter, queue for processing
+# Separator must match QUEUE_SEPARATOR in bin/habit-tools.sh
 printf '%s\n---HABIT_SEPARATOR---\n' "$PROMPT" >> "/tmp/habit-watch-queue-$SESSION_ID"
 
 exit 0
