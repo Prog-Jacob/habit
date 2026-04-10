@@ -12,7 +12,7 @@ Runs in forked subagent. All data is pre-loaded below.
 
 ## User prompts from this session
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript ${TRANSCRIPT_PATH:-${CLAUDE_SESSION_ID}}`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript ${CLAUDE_SESSION_ID}`
 
 ## Current Index (merged)
 
