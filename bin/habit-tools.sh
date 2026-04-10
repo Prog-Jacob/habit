@@ -49,6 +49,13 @@ write_state() {
   atomic_write_file "$dir/$STATE_FILE"
 }
 
+# Read state, pipe through a transform command, write back.
+# Usage: update_state "$dir" jq [flags...] 'expression'
+update_state() {
+  local dir="$1"; shift
+  read_state "$dir" | "$@" | write_state "$dir"
+}
+
 # Extract YAML frontmatter block (between --- delimiters) from a habit .md file.
 extract_frontmatter() {
   local file="$1"
@@ -118,11 +125,8 @@ cmd_read_index() {
   fi
 
   case "$scope" in
-    global)
-      read_state "$GLOBAL_DIR" | jq '{entries: .index}'
-      ;;
-    project)
-      read_state "$PROJECT_DIR" | jq '{entries: .index}'
+    global|project)
+      read_state "$(resolve_dir "$scope")" | jq '{entries: .index}'
       ;;
     merged)
       local global project
@@ -221,14 +225,8 @@ cmd_write_habit() {
   local entry
   entry=$(build_index_entry "$habit_file")
 
-  local state
-  state=$(read_state "$dir")
-
-  # Update index: remove old entry with same id, add new one. Bump counter.
-  echo "$state" | jq \
-    --argjson entry "$entry" \
-    '.index = [(.index[] | select(.id != $entry.id)), $entry] | .meta.update_counter += 1' \
-    | write_state "$dir"
+  update_state "$dir" jq --argjson entry "$entry" \
+    '.index = [(.index[] | select(.id != $entry.id)), $entry] | .meta.update_counter += 1'
 
   echo "OK wrote $habit_file"
 }
@@ -258,20 +256,48 @@ cmd_log_exec() {
     --arg scope "$scope" \
     '{id: $id, override: $override, timestamp: $timestamp, scope: $scope}')
 
-  local state
-  state=$(read_state "$dir")
-
-  # Append to log. Bump counter only if override was provided.
+  # Bump counter only if override was provided.
   local bump=0
   [ -n "$override" ] && bump=1
 
-  echo "$state" | jq \
-    --argjson entry "$log_entry" \
-    --argjson bump "$bump" \
-    '.log += [$entry] | .meta.update_counter += $bump' \
-    | write_state "$dir"
+  update_state "$dir" jq --argjson entry "$log_entry" --argjson bump "$bump" \
+    '.log += [$entry] | .meta.update_counter += $bump'
 
   echo "OK logged exec for $id"
+}
+
+# --- Deep Distill Maintenance ---
+
+cmd_reset_meta() {
+  local scope="$1"
+  local dir
+  dir=$(resolve_dir "$scope")
+
+  [ -d "$dir" ] || { echo "No habits directory for scope: $scope"; exit 0; }
+
+  local timestamp
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  update_state "$dir" jq --arg ts "$timestamp" \
+    '.meta.update_counter = 0 | .meta.last_deep_timestamp = $ts'
+
+  echo "OK reset meta for $scope"
+}
+
+cmd_prune_log() {
+  local scope="$1"
+  local dir
+  dir=$(resolve_dir "$scope")
+
+  [ -d "$dir" ] || { echo "No habits directory for scope: $scope"; exit 0; }
+
+  local cutoff
+  cutoff=$(date -u -v-90d +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "90 days ago" +"%Y-%m-%dT%H:%M:%SZ")
+
+  update_state "$dir" jq --arg cutoff "$cutoff" \
+    '.log = [.log[] | select(.timestamp > $cutoff)] | .log = .log[-500:]'
+
+  echo "OK pruned log for $scope"
 }
 
 # --- Self-Heal ---
@@ -296,12 +322,7 @@ cmd_self_heal() {
     count=$((count + 1))
   done
 
-  # Preserve existing log and meta, rebuild index only
-  local state
-  state=$(read_state "$dir")
-
-  echo "$state" | jq --argjson entries "$entries_json" '.index = $entries' \
-    | write_state "$dir"
+  update_state "$dir" jq --argjson entries "$entries_json" '.index = $entries'
 
   echo "OK rebuilt index with $count entries"
 }
@@ -321,9 +342,11 @@ case "$cmd" in
   write-habit)      cmd_write_habit "$@" ;;
   log-exec)         cmd_log_exec "$@" ;;
   self-heal)        cmd_self_heal "$@" ;;
+  reset-meta)       cmd_reset_meta "$@" ;;
+  prune-log)        cmd_prune_log "$@" ;;
   *)
     echo "Usage: habit-tools.sh <command> [args]" >&2
-    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-watch-state, read-log, write-habit, log-exec, self-heal" >&2
+    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-watch-state, read-log, write-habit, log-exec, self-heal, reset-meta, prune-log" >&2
     exit 1
     ;;
 esac
