@@ -268,6 +268,7 @@ cmd_read_transcript() {
 cmd_write_habit() {
   local scope="$1"
   local id="$2"
+  [[ "$id" =~ ^[a-z0-9-]{1,40}$ ]] || { echo "Invalid id: $id" >&2; exit 1; }
   local dir
   dir=$(resolve_dir "$scope")
 
@@ -366,18 +367,15 @@ cmd_self_heal() {
 
   [ -d "$dir" ] || { echo "No habits directory for scope: $scope"; exit 0; }
 
-  local entries_json="[]"
-  local count=0
-
-  for md_file in "$dir"/*.md; do
-    [ -f "$md_file" ] || continue
-
-    local entry
-    entry=$(build_index_entry "$md_file")
-
-    entries_json=$(echo "$entries_json" | jq --argjson entry "$entry" '. + [$entry]')
-    count=$((count + 1))
-  done
+  local entries_json
+  entries_json=$(
+    for md_file in "$dir"/*.md; do
+      [ -f "$md_file" ] || continue
+      build_index_entry "$md_file"
+    done | jq -s '.'
+  )
+  local count
+  count=$(echo "$entries_json" | jq 'length')
 
   update_state "$dir" jq --argjson entries "$entries_json" '.index = $entries'
 
