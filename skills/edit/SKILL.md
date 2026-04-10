@@ -7,6 +7,10 @@ allowed-tools: Bash(bash:*)
 
 # /habit:edit: Create or Update
 
+## Triggers
+
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
+
 ## Existing Habit (if any)
 
 !`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit $ARGUMENTS`
@@ -28,6 +32,6 @@ allowed-tools: Bash(bash:*)
 | No      | Yes    | Create new habit from description                       |
 | No      | No     | Ask what this habit should do and stop (skip steps 3-4) |
 
-3. **Skip if only asking the user a question.** Otherwise: apply the Processing Rules above for interpretation, deduplication, and scope detection. Edit in the scope where it was found. To change scope, the user must explicitly request it.
+3. **Skip if only asking the user a question.** Otherwise: apply the Processing Rules above. Edit in the scope where it was found. To change scope, the user must explicitly request it.
 
 4. Write via `write-habit`, confirm: `Created habit \`id\` [tags] description. (scope)`or`Updated habit \`id\` what changed.`

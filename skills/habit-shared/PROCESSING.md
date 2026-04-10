@@ -17,6 +17,8 @@ All file operations go through `habit-tools.sh`. Never use the Read or Write too
 - **Write a habit:** pipe full content (frontmatter + body) to `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh write-habit <scope> <id>`
 - **Log an execution:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-exec <scope> <id> [override]`
 - **Self-heal:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh self-heal <scope>`
+- **Reset meta (after deep distill):** zero the update counter and set last deep timestamp. `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-meta <scope>`
+- **Prune log (after deep distill):** drop entries older than 30 days, cap at 500. `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh prune-log <scope>`
 
 ## 1. Interpretation
 
@@ -67,20 +69,6 @@ archived: false
 <structured instruction body>
 ```
 
-## 6. Queue Drain
+## 6. Auto-Triggers
 
-**Only runs during `/habit:watch off` and `/habit:distill`.** Not on `/habit` or `/habit:run`. Those are fast paths.
-
-If `/tmp/habit-watch-queue-${CLAUDE_SESSION_ID}` exists and is non-empty, process it:
-
-1. Read the file. Prompts are separated by `---HABIT_SEPARATOR---`.
-2. Classify each: reusable or one-off (same criteria as Section 1).
-3. For reusable prompts, apply interpretation, dedup, scope detection (Sections 1-4).
-4. Write each via `write-habit`.
-5. Truncate the queue file after processing.
-
-## 7. Self-Healing
-
-Run `self-heal <scope>` to deterministically rebuild the index from `.md` frontmatter and ensure `settings.local.json` exists with defaults.
-
-Trigger when: index is missing or corrupt, orphaned entries detected, or after manual edits to habit files.
+Trigger flags are preloaded in the skill above. `none` means proceed normally. `distill` or `deep` means maintenance is available: after your primary task, suggest `/habit:distill` to the user. (Does not apply inside `/habit:distill`.)
