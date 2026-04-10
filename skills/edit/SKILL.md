@@ -11,6 +11,10 @@ allowed-tools: Bash(bash:*)
 
 !`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit $ARGUMENTS`
 
+## Processing Rules
+
+@${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/PROCESSING.md
+
 ## Instructions
 
 1. Parse `$ARGUMENTS`: first token = id (lowercase, alphanumeric + hyphens, max 40 chars), rest = changes/description.
@@ -22,16 +26,8 @@ allowed-tools: Bash(bash:*)
 | Yes     | Yes    | Apply changes to existing habit, write back             |
 | Yes     | No     | Show current state, ask what to change                  |
 | No      | Yes    | Create new habit from description                       |
-| No      | No     | Ask what this habit should do and stop (skip steps 3-5) |
+| No      | No     | Ask what this habit should do and stop (skip steps 3-4) |
 
-3. **Skip this step if you are only asking the user a question.** Otherwise: read `${CLAUDE_SKILL_DIR}/../habit-shared/PROCESSING.md` and apply its rules for interpretation, deduplication, and scope detection. Edit the habit in the scope where it was found. To change scope, the user must explicitly request it.
+3. **Skip if only asking the user a question.** Otherwise: apply the Processing Rules above for interpretation, deduplication, and scope detection. Edit in the scope where it was found. To change scope, the user must explicitly request it.
 
-4. Write the habit by piping the complete file content (YAML frontmatter + body) to:
-
-   ```
-   bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh write-habit <scope> <id>
-   ```
-
-   This atomically writes the file, updates the index, and bumps the counter.
-
-5. Confirm: `Created habit \`id\` [tags] description. (scope)`or`Updated habit \`id\` what changed.`
+4. Write via `write-habit`, confirm: `Created habit \`id\` [tags] description. (scope)`or`Updated habit \`id\` what changed.`

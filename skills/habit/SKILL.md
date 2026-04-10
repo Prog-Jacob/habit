@@ -12,6 +12,7 @@ This skill is the main entry point for the Habit system. Route based on what the
 ## Routing
 
 - **Browsing/searching/listing** → handle below.
+- **Viewing full details** ("show me X", "what does X do") → guide to `/habit:edit <id>` (shows full content when no changes are provided).
 - **Creating or editing** → guide to `/habit:edit <id> <description>`.
 - **Running a specific habit** → guide to `/habit:run <id> [override]`.
 - **Watching/observing** → guide to `/habit:watch`.
@@ -40,9 +41,7 @@ This skill is the main entry point for the Habit system. Route based on what the
 
    > Pick a number or name to run, add context for an override (e.g. "1 only in auth" or "fix-types in auth"), or say "edit N" to modify.
 
-6. **When user picks one:** read `${CLAUDE_SKILL_DIR}/../run/SKILL.md` and follow its instructions to execute the selected habit.
+6. **When user picks one:** guide to `/habit:run <id> [override]`.
 
 7. Empty inventory:
    > No habits yet. Create one with `/habit:edit <name> <description>` or start watching with `/habit:watch`.
-
-Only the index is loaded. Full `.md` files are loaded only when user selects one for execution.
