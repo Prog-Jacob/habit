@@ -1,6 +1,6 @@
 {
   "name": "habit",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Intelligent prompt inventory. Observes, captures, and evolves reusable prompts into a living collection.",
   "author": {
     "name": "prog-jacob"
