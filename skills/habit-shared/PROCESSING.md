@@ -40,21 +40,52 @@ From `_log.jsonl`: group by id, collect overrides, normalize (lowercase, trim). 
 
 ## 5. Write Sequence
 
-1. Write `<id>.md` with YAML frontmatter (id, tags, description, scope, created, updated, archived: false) and instruction body under `## Instruction`.
-2. Update `_index.json` (add/update entry).
-3. Increment `update_counter` in `_meta.json`.
+Pipe the complete habit file (YAML frontmatter + instruction body) to:
 
-Create missing dirs/files as needed.
+```
+bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh write-habit <scope> <id>
+```
+
+This atomically writes the `.md` file, updates `_index.json`, and increments `update_counter` in `_meta.json`. Creates missing dirs/files as needed.
+
+The file content must follow this format:
+
+```
+---
+id: <id>
+tags: [tag1, tag2]
+description: <one-line, max 120 chars, starts with verb>
+scope: <global|project>
+created: <ISO 8601>
+updated: <ISO 8601>
+archived: false
+---
+
+## Instruction
+
+<structured instruction body>
+```
 
 ## 6. Queue Drain
+
+**Only runs during `/habit:watch off` and `/habit:distill`.** Not on `/habit` or `/habit:run`. Those are fast paths.
 
 If `/tmp/habit-watch-queue-${CLAUDE_SESSION_ID}` exists and is non-empty, process it:
 
 1. Read the file. Prompts are separated by `---HABIT_SEPARATOR---`.
 2. Classify each: reusable or one-off (same criteria as Section 1).
-3. For reusable prompts, apply interpretation, dedup, scope detection, and write sequence (Sections 1-5).
-4. Truncate the queue file after processing.
+3. For reusable prompts, apply interpretation, dedup, scope detection (Sections 1-4).
+4. Write each new/updated habit via: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh write-habit <scope> <id>`
+5. Truncate the queue file after processing.
 
 ## 7. Self-Healing
 
-On read: missing `_index.json` → rebuild from `.md` frontmatter. Missing `_meta.json` → create with defaults. Missing `_log.jsonl` → create empty. Orphaned index entry → remove. `.md` without entry → add. Corrupt frontmatter → skip, warn.
+Run: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh self-heal <scope>`
+
+This deterministically rebuilds `_index.json` from `.md` frontmatter, creates missing `_meta.json` and `_log.jsonl` with defaults. No Claude reasoning involved. The script handles it.
+
+Trigger self-heal when:
+
+- Index is missing or corrupt
+- Orphaned entries detected
+- After manual edits to habit files
