@@ -7,13 +7,13 @@ allowed-tools: Bash(bash:*)
 
 # /habit:watch: Observation Toggle
 
+## Triggers
+
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
+
 ## Watch State
 
 !`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-watch-state ${CLAUDE_SESSION_ID}`
-
-## User prompts from this session
-
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript ${CLAUDE_SESSION_ID}`
 
 ## Processing Rules
 
@@ -22,17 +22,17 @@ allowed-tools: Bash(bash:*)
 ## Deactivate (`$ARGUMENTS` is `off`, `stop`, or `disable`)
 
 1. If Watch State above is `INACTIVE` → "Watch wasn't active." and stop.
-2. Remove `/tmp/habit-watch-active-${CLAUDE_SESSION_ID}` via Bash.
-3. Drain watch queue per Section 6 above.
-4. Print summary: created N, updated M. List ids.
-5. Clean up temp files.
+2. Stop collecting: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh watch-stop ${CLAUDE_SESSION_ID}`
+3. Read the queue: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-watch-queue ${CLAUDE_SESSION_ID}`
+4. If queue has prompts (separated by `---HABIT_SEPARATOR---` markers):
+   - Classify each: reusable or one-off.
+   - Apply the Processing Rules (interpretation, dedup, scope detection).
+   - Write each via `write-habit`.
+5. Clear queue: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-watch-queue ${CLAUDE_SESSION_ID}`
+6. Print summary: created N, updated M. List ids.
 
 ## Activate (no arguments)
 
 1. If Watch State above is `ACTIVE` → "Already watching." and stop.
-2. Create sentinel via Bash: `touch /tmp/habit-watch-active-${CLAUDE_SESSION_ID}`
-3. Initialize queue via Bash: `touch /tmp/habit-watch-queue-${CLAUDE_SESSION_ID}`
-4. Sweep session using the user prompts above. Classify each: reusable if it describes a generalizable workflow or constraint (even if used only once), one-off if it's a question or specific debugging. Apply the Processing Rules for reusable candidates.
-5. Confirm: "Watching. Swept session so far: captured N patterns." List captured habit ids and one-line descriptions.
-
-Hook collects subsequent prompts to queue asynchronously. Queue is processed on deactivation.
+2. Start watch: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh watch-start ${CLAUDE_SESSION_ID}`
+3. Confirm: "Watching. I'll capture patterns as you work. Run `/habit:watch off` to stop and process."
