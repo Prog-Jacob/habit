@@ -9,6 +9,8 @@ GLOBAL_DIR="$HOME/.claude/habits"
 # Relative to project root. This script is invoked by skills via
 # ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh, which always runs from project root.
 PROJECT_DIR=".claude/habits"
+STATE_FILE="settings.local.json"
+DEFAULT_STATE='{"index":[],"meta":{"version":1,"update_counter":0,"last_deep_timestamp":null},"log":[]}'
 
 # --- Helpers ---
 
@@ -21,18 +23,30 @@ ensure_dir() {
   [ -d "$dir" ] || mkdir -p "$dir"
 }
 
-ensure_file() {
-  local file="$1" default="$2"
-  [ -f "$file" ] || echo "$default" > "$file"
+# Read the state file for a scope dir, or return default if missing.
+read_state() {
+  require_jq
+  local dir="$1"
+  if [ -f "$dir/$STATE_FILE" ]; then
+    cat "$dir/$STATE_FILE"
+  else
+    echo "$DEFAULT_STATE"
+  fi
 }
 
-read_index_file() {
-  local file="$1"
-  if [ -f "$file" ]; then
-    cat "$file"
-  else
-    echo '{"entries":[]}'
-  fi
+# Write stdin to a file atomically via tmp+mv.
+atomic_write_file() {
+  local target="$1"
+  local tmp
+  tmp=$(mktemp)
+  cat > "$tmp"
+  mv "$tmp" "$target"
+}
+
+# Write state atomically.
+write_state() {
+  local dir="$1"
+  atomic_write_file "$dir/$STATE_FILE"
 }
 
 # Extract YAML frontmatter block (between --- delimiters) from a habit .md file.
@@ -47,7 +61,7 @@ fm_field() {
   grep "^${field}:" | head -1 | sed "s/^${field}: *//"
 }
 
-# Build a JSON index entry from a habit .md file. Requires jq.
+# Build a JSON index entry from a habit .md file.
 build_index_entry() {
   require_jq
   local file="$1"
@@ -84,34 +98,36 @@ build_index_entry() {
     '{id: $id, tags: $tags, description: $description, scope: $scope, created: $created, updated: $updated, archived: $archived}'
 }
 
-# Write content to a file atomically via tmp+mv.
-atomic_write() {
-  local target="$1"
-  local tmp
-  tmp=$(mktemp)
-  cat > "$tmp"
-  mv "$tmp" "$target"
+# Resolve scope string to directory path.
+resolve_dir() {
+  local scope="$1"
+  case "$scope" in
+    global)  echo "$GLOBAL_DIR" ;;
+    project) echo "$PROJECT_DIR" ;;
+    *) echo "Unknown scope: $scope" >&2; exit 1 ;;
+  esac
 }
 
-# --- Commands ---
+# --- Read Commands ---
 
 cmd_read_index() {
   local scope="${1:---scope}"
   local value="${2:-merged}"
-  # Handle both "--scope merged" and just "merged"
   if [ "$scope" = "--scope" ]; then
     scope="$value"
   fi
 
   case "$scope" in
-    global)  read_index_file "$GLOBAL_DIR/_index.json" ;;
-    project) read_index_file "$PROJECT_DIR/_index.json" ;;
+    global)
+      read_state "$GLOBAL_DIR" | jq '{entries: .index}'
+      ;;
+    project)
+      read_state "$PROJECT_DIR" | jq '{entries: .index}'
+      ;;
     merged)
       local global project
-      global=$(read_index_file "$GLOBAL_DIR/_index.json")
-      project=$(read_index_file "$PROJECT_DIR/_index.json")
-      # Merge: project entries shadow global entries with same id
-      require_jq
+      global=$(read_state "$GLOBAL_DIR" | jq '{entries: .index}')
+      project=$(read_state "$PROJECT_DIR" | jq '{entries: .index}')
       jq -n \
         --argjson g "$global" \
         --argjson p "$project" \
@@ -131,28 +147,16 @@ cmd_read_meta() {
   fi
 
   local dir
-  case "$scope" in
-    global)  dir="$GLOBAL_DIR" ;;
-    project) dir="$PROJECT_DIR" ;;
-    *) echo "Unknown scope: $scope" >&2; exit 1 ;;
-  esac
-
-  if [ -f "$dir/_meta.json" ]; then
-    cat "$dir/_meta.json"
-  else
-    echo '{"version":1,"update_counter":0,"last_deep_timestamp":null}'
-  fi
+  dir=$(resolve_dir "$scope")
+  read_state "$dir" | jq '.meta'
 }
 
 cmd_read_habit() {
-  # Parse: first token = id, rest preserved for Claude
   local id="${1:-}"
   [ -z "$id" ] && { echo "NOT_FOUND"; echo "No id provided"; exit 0; }
 
-  # Strip everything after first whitespace for the id
   id=$(echo "$id" | awk '{print $1}')
 
-  # Resolve: project first, then global
   if [ -f "$PROJECT_DIR/$id.md" ]; then
     echo "SCOPE:project"
     cat "$PROJECT_DIR/$id.md"
@@ -161,7 +165,6 @@ cmd_read_habit() {
     cat "$GLOBAL_DIR/$id.md"
   else
     echo "NOT_FOUND"
-    # Output the merged index so Claude can do fuzzy matching
     echo "--- INDEX ---"
     cmd_read_index --scope merged
   fi
@@ -174,52 +177,38 @@ cmd_read_watch_state() {
 }
 
 cmd_read_log() {
-  cat "$GLOBAL_DIR/_log.jsonl" 2>/dev/null
-  cat "$PROJECT_DIR/_log.jsonl" 2>/dev/null
+  read_state "$GLOBAL_DIR" | jq -c '.log[]' 2>/dev/null || true
+  read_state "$PROJECT_DIR" | jq -c '.log[]' 2>/dev/null || true
 }
 
 cmd_read_transcript() {
-  local session_id="${1:-}"
-  [ -z "$session_id" ] && { echo "No session data yet."; exit 0; }
+  local arg="${1:-}"
+  [ -z "$arg" ] && { echo "No session data yet."; exit 0; }
 
-  local path_file="/tmp/habit-transcript-$session_id"
-  [ -f "$path_file" ] || { echo "No session data yet."; exit 0; }
+  local transcript_path=""
 
-  local transcript_path
-  transcript_path=$(cat "$path_file")
-  [ -f "$transcript_path" ] || { echo "No session data yet."; exit 0; }
+  if [ -f "$arg" ]; then
+    transcript_path="$arg"
+  else
+    local path_file="/tmp/habit-transcript-$arg"
+    [ -f "$path_file" ] || { echo "No session data yet."; exit 0; }
+    transcript_path=$(cat "$path_file")
+    [ -f "$transcript_path" ] || { echo "No session data yet."; exit 0; }
+  fi
 
   require_jq
-  jq -r 'select(.type=="user") | .message.content | if type == "string" then . elif type == "array" then map(select(.type=="text") | .text) | join("\n") else empty end' "$transcript_path" 2>/dev/null || echo "No session data yet."
+  # Extract user messages. The jq slurp takes all user messages, then [-30:]
+  # keeps the last 30 to cap context size in long sessions.
+  jq -s '[.[] | select(.type=="user")] | .[-30:] | .[] | .message.content | if type == "string" then . elif type == "array" then map(select(.type=="text") | .text) | join("\n") else empty end' "$transcript_path" 2>/dev/null || echo "No session data yet."
 }
 
-# --- Write Operations ---
-
-cmd_bump_counter() {
-  require_jq
-  local scope="$1"
-  local dir
-  case "$scope" in
-    global)  dir="$GLOBAL_DIR" ;;
-    project) dir="$PROJECT_DIR" ;;
-    *) echo "Unknown scope: $scope" >&2; exit 1 ;;
-  esac
-
-  ensure_dir "$dir"
-  ensure_file "$dir/_meta.json" '{"version":1,"update_counter":0,"last_deep_timestamp":null}'
-
-  jq '.update_counter += 1' "$dir/_meta.json" | atomic_write "$dir/_meta.json"
-}
+# --- Write Commands ---
 
 cmd_write_habit() {
   local scope="$1"
   local id="$2"
   local dir
-  case "$scope" in
-    global)  dir="$GLOBAL_DIR" ;;
-    project) dir="$PROJECT_DIR" ;;
-    *) echo "Unknown scope: $scope" >&2; exit 1 ;;
-  esac
+  dir=$(resolve_dir "$scope")
 
   ensure_dir "$dir"
 
@@ -227,36 +216,29 @@ cmd_write_habit() {
   content=$(cat)
 
   local habit_file="$dir/$id.md"
-  printf '%s\n' "$content" | atomic_write "$habit_file"
+  printf '%s\n' "$content" | atomic_write_file "$habit_file"
 
-  # Build index entry from the written file
   local entry
   entry=$(build_index_entry "$habit_file")
 
-  # Update _index.json atomically
-  local index_file="$dir/_index.json"
-  ensure_file "$index_file" '{"entries":[]}'
+  local state
+  state=$(read_state "$dir")
 
-  jq --argjson entry "$entry" \
-    '.entries = [(.entries[] | select(.id != $entry.id)), $entry]' \
-    "$index_file" | atomic_write "$index_file"
-
-  cmd_bump_counter "$scope"
+  # Update index: remove old entry with same id, add new one. Bump counter.
+  echo "$state" | jq \
+    --argjson entry "$entry" \
+    '.index = [(.index[] | select(.id != $entry.id)), $entry] | .meta.update_counter += 1' \
+    | write_state "$dir"
 
   echo "OK wrote $habit_file"
 }
 
 cmd_log_exec() {
-  require_jq
   local scope="$1"
   local id="$2"
   local override="${3:-}"
   local dir
-  case "$scope" in
-    global)  dir="$GLOBAL_DIR" ;;
-    project) dir="$PROJECT_DIR" ;;
-    *) echo "Unknown scope: $scope" >&2; exit 1 ;;
-  esac
+  dir=$(resolve_dir "$scope")
 
   ensure_dir "$dir"
 
@@ -276,12 +258,18 @@ cmd_log_exec() {
     --arg scope "$scope" \
     '{id: $id, override: $override, timestamp: $timestamp, scope: $scope}')
 
-  echo "$log_entry" >> "$dir/_log.jsonl"
+  local state
+  state=$(read_state "$dir")
 
-  # Bump counter only if override was provided
-  if [ -n "$override" ]; then
-    cmd_bump_counter "$scope"
-  fi
+  # Append to log. Bump counter only if override was provided.
+  local bump=0
+  [ -n "$override" ] && bump=1
+
+  echo "$state" | jq \
+    --argjson entry "$log_entry" \
+    --argjson bump "$bump" \
+    '.log += [$entry] | .meta.update_counter += $bump' \
+    | write_state "$dir"
 
   echo "OK logged exec for $id"
 }
@@ -291,15 +279,9 @@ cmd_log_exec() {
 cmd_self_heal() {
   local scope="$1"
   local dir
-  case "$scope" in
-    global)  dir="$GLOBAL_DIR" ;;
-    project) dir="$PROJECT_DIR" ;;
-    *) echo "Unknown scope: $scope" >&2; exit 1 ;;
-  esac
+  dir=$(resolve_dir "$scope")
 
-  ensure_dir "$dir"
-  ensure_file "$dir/_meta.json" '{"version":1,"update_counter":0,"last_deep_timestamp":null}'
-  ensure_file "$dir/_log.jsonl" ""
+  [ -d "$dir" ] || { echo "No habits directory for scope: $scope"; exit 0; }
 
   local entries_json="[]"
   local count=0
@@ -314,9 +296,14 @@ cmd_self_heal() {
     count=$((count + 1))
   done
 
-  jq -n --argjson entries "$entries_json" '{entries: $entries}' | atomic_write "$dir/_index.json"
+  # Preserve existing log and meta, rebuild index only
+  local state
+  state=$(read_state "$dir")
 
-  echo "OK rebuilt _index.json with $count entries"
+  echo "$state" | jq --argjson entries "$entries_json" '.index = $entries' \
+    | write_state "$dir"
+
+  echo "OK rebuilt index with $count entries"
 }
 
 # --- Main Router ---
@@ -325,19 +312,18 @@ cmd="${1:-}"
 shift || true
 
 case "$cmd" in
-  read-index)     cmd_read_index "$@" ;;
-  read-habit)     cmd_read_habit "$@" ;;
-  read-meta)      cmd_read_meta "$@" ;;
-  read-transcript) cmd_read_transcript "$@" ;;
+  read-index)       cmd_read_index "$@" ;;
+  read-habit)       cmd_read_habit "$@" ;;
+  read-meta)        cmd_read_meta "$@" ;;
+  read-transcript)  cmd_read_transcript "$@" ;;
   read-watch-state) cmd_read_watch_state "$@" ;;
-  read-log)       cmd_read_log "$@" ;;
-  write-habit)    cmd_write_habit "$@" ;;
-  log-exec)       cmd_log_exec "$@" ;;
-  bump-counter)   cmd_bump_counter "$@" ;;
-  self-heal)      cmd_self_heal "$@" ;;
+  read-log)         cmd_read_log "$@" ;;
+  write-habit)      cmd_write_habit "$@" ;;
+  log-exec)         cmd_log_exec "$@" ;;
+  self-heal)        cmd_self_heal "$@" ;;
   *)
     echo "Usage: habit-tools.sh <command> [args]" >&2
-    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-watch-state, read-log, write-habit, log-exec, bump-counter, self-heal" >&2
+    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-watch-state, read-log, write-habit, log-exec, self-heal" >&2
     exit 1
     ;;
 esac
