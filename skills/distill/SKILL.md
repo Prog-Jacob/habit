@@ -12,7 +12,7 @@ Runs in forked subagent. All data is pre-loaded below.
 
 ## User prompts from this session
 
-!`cat "$(cat /tmp/habit-transcript-${CLAUDE_SESSION_ID} 2>/dev/null)" 2>/dev/null | jq -r 'select(.type=="user") | .message.content | if type == "string" then . elif type == "array" then map(select(.type=="text") | .text) | join("\n") else empty end' 2>/dev/null || echo "No session data yet."`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript ${CLAUDE_SESSION_ID}`
 
 ## Current Index (merged)
 
@@ -20,11 +20,11 @@ Runs in forked subagent. All data is pre-loaded below.
 
 ## Execution Log
 
-!`cat ~/.claude/habits/_log.jsonl 2>/dev/null; cat .claude/habits/_log.jsonl 2>/dev/null`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-log`
 
 ## Metadata
 
-!`cat ~/.claude/habits/_meta.json 2>/dev/null || echo '{"version":1,"update_counter":0,"last_deep_timestamp":null}'`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-meta --scope global`
 
 ## Regular (no arguments)
 

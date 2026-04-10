@@ -20,11 +20,11 @@ This skill is the main entry point for the Habit system. Route based on what the
 
 ## Global Index
 
-!`cat ~/.claude/habits/_index.json 2>/dev/null || echo '{"entries":[]}'`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index --scope global`
 
 ## Project Index
 
-!`cat .claude/habits/_index.json 2>/dev/null || echo '{"entries":[]}'`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index --scope project`
 
 ## Browse & Select
 

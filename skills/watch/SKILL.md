@@ -9,11 +9,11 @@ allowed-tools: Bash(bash:*)
 
 ## Watch State
 
-!`test -f /tmp/habit-watch-active-${CLAUDE_SESSION_ID} && echo "ACTIVE" || echo "INACTIVE"`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-watch-state ${CLAUDE_SESSION_ID}`
 
 ## User prompts from this session
 
-!`cat "$(cat /tmp/habit-transcript-${CLAUDE_SESSION_ID} 2>/dev/null)" 2>/dev/null | jq -r 'select(.type=="user") | .message.content | if type == "string" then . elif type == "array" then map(select(.type=="text") | .text) | join("\n") else empty end' 2>/dev/null || echo "No session data yet."`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript ${CLAUDE_SESSION_ID}`
 
 ## Deactivate (`$ARGUMENTS` is `off`, `stop`, or `disable`)
 

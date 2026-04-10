@@ -167,6 +167,32 @@ cmd_read_habit() {
   fi
 }
 
+cmd_read_watch_state() {
+  local session_id="${1:-}"
+  [ -z "$session_id" ] && { echo "INACTIVE"; exit 0; }
+  [ -f "/tmp/habit-watch-active-$session_id" ] && echo "ACTIVE" || echo "INACTIVE"
+}
+
+cmd_read_log() {
+  cat "$GLOBAL_DIR/_log.jsonl" 2>/dev/null
+  cat "$PROJECT_DIR/_log.jsonl" 2>/dev/null
+}
+
+cmd_read_transcript() {
+  local session_id="${1:-}"
+  [ -z "$session_id" ] && { echo "No session data yet."; exit 0; }
+
+  local path_file="/tmp/habit-transcript-$session_id"
+  [ -f "$path_file" ] || { echo "No session data yet."; exit 0; }
+
+  local transcript_path
+  transcript_path=$(cat "$path_file")
+  [ -f "$transcript_path" ] || { echo "No session data yet."; exit 0; }
+
+  require_jq
+  jq -r 'select(.type=="user") | .message.content | if type == "string" then . elif type == "array" then map(select(.type=="text") | .text) | join("\n") else empty end' "$transcript_path" 2>/dev/null || echo "No session data yet."
+}
+
 # --- Write Operations ---
 
 cmd_bump_counter() {
@@ -302,13 +328,16 @@ case "$cmd" in
   read-index)     cmd_read_index "$@" ;;
   read-habit)     cmd_read_habit "$@" ;;
   read-meta)      cmd_read_meta "$@" ;;
+  read-transcript) cmd_read_transcript "$@" ;;
+  read-watch-state) cmd_read_watch_state "$@" ;;
+  read-log)       cmd_read_log "$@" ;;
   write-habit)    cmd_write_habit "$@" ;;
   log-exec)       cmd_log_exec "$@" ;;
   bump-counter)   cmd_bump_counter "$@" ;;
   self-heal)      cmd_self_heal "$@" ;;
   *)
     echo "Usage: habit-tools.sh <command> [args]" >&2
-    echo "Commands: read-index, read-habit, read-meta, write-habit, log-exec, bump-counter, self-heal" >&2
+    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-watch-state, read-log, write-habit, log-exec, bump-counter, self-heal" >&2
     exit 1
     ;;
 esac
