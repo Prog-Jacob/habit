@@ -25,19 +25,15 @@ If triggers are not `none`, add after your response: "Habit maintenance availabl
 - **Extracting/sweeping** → guide to `/habit:distill`.
 - **Discovery** → explain the habit system briefly and suggest `/habit:edit` or `/habit:watch`.
 
-## Global Index
+## Index (merged, project shadows global)
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index --scope global`
-
-## Project Index
-
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index --scope project`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index --scope merged`
 
 ## Browse & Select
 
 1. `$ARGUMENTS` empty → list all. Non-empty → search query.
 
-2. The indexes above are already loaded. Merge: project shadows global on same id. If both scopes have entries, show `[G]`/`[P]` indicators. Exclude archived.
+2. The merged index is already loaded. Each entry has a `scope` field (`global` or `project`). Show `[G]`/`[P]` indicators. Exclude archived.
 
 3. If searching, fuzzy-match query against id, tags, description. Show only entries that match. If nothing matches, say so and suggest creating one or trying a different search.
 
