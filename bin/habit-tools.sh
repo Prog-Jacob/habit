@@ -10,11 +10,13 @@ GLOBAL_DIR="$HOME/.claude/habits"
 # ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh, which always runs from project root.
 PROJECT_DIR=".claude/habits"
 STATE_FILE="settings.local.json"
-DEFAULT_STATE='{"index":[],"meta":{"version":1,"update_counter":0,"last_deep_timestamp":null},"log":[]}'
+DEFAULT_STATE='{"index":[],"meta":{"update_counter":0,"last_deep_timestamp":null},"log":[]}'
 
 # Must match the separator hardcoded in hooks/habit-watch-gate.sh
 QUEUE_SEPARATOR="---HABIT_SEPARATOR---"
 QUEUE_THRESHOLD=20
+LOG_TRIGGER=50
+LOG_RETAIN=25
 
 # --- Helpers ---
 
@@ -79,7 +81,7 @@ build_index_entry() {
   local fm
   fm=$(extract_frontmatter "$file")
 
-  local fm_id fm_tags fm_description fm_scope fm_created fm_updated fm_archived
+  local fm_id fm_tags fm_description fm_scope fm_created fm_updated fm_archived fm_last_executed
   fm_id=$(echo "$fm" | fm_field "id")
   fm_tags=$(echo "$fm" | fm_field "tags" | sed 's/^\[//;s/\]$//')
   fm_description=$(echo "$fm" | fm_field "description" | sed 's/^"//;s/"$//')
@@ -87,6 +89,7 @@ build_index_entry() {
   fm_created=$(echo "$fm" | fm_field "created")
   fm_updated=$(echo "$fm" | fm_field "updated")
   fm_archived=$(echo "$fm" | fm_field "archived")
+  fm_last_executed=$(echo "$fm" | fm_field "last_executed")
 
   local tags_json="[]"
   if [ -n "$fm_tags" ]; then
@@ -104,7 +107,9 @@ build_index_entry() {
     --arg created "$fm_created" \
     --arg updated "$fm_updated" \
     --argjson archived "$archived_val" \
-    '{id: $id, tags: $tags, description: $description, scope: $scope, created: $created, updated: $updated, archived: $archived}'
+    --arg last_executed "$fm_last_executed" \
+    '{id: $id, tags: $tags, description: $description, scope: $scope, created: $created, updated: $updated, archived: $archived}
+     | if $last_executed != "" then .last_executed = $last_executed else . end'
 }
 
 # Resolve scope string to directory path.
@@ -223,19 +228,23 @@ cmd_check_triggers() {
     return
   fi
 
+  local gl pl
+  gl=$(read_state "$GLOBAL_DIR" | jq '.log | length')
+  pl=$(read_state "$PROJECT_DIR" | jq '.log | length')
+
+  local qc=0
   if [ -n "$session_id" ]; then
     local queue="/tmp/habit-watch-queue-$session_id"
     if [ -f "$queue" ] && [ -s "$queue" ]; then
-      local qc
       qc=$(grep -c "$QUEUE_SEPARATOR" "$queue" 2>/dev/null || echo "0")
-      if [ "$qc" -ge "$QUEUE_THRESHOLD" ]; then
-        echo "TRIGGERS: distill"
-        return
-      fi
     fi
   fi
 
-  echo "TRIGGERS: none"
+  if [ "$gl" -ge "$LOG_TRIGGER" ] || [ "$pl" -ge "$LOG_TRIGGER" ] || [ "$qc" -ge "$QUEUE_THRESHOLD" ]; then
+    echo "TRIGGERS: distill"
+  else
+    echo "TRIGGERS: none"
+  fi
 }
 
 cmd_read_log() {
@@ -274,8 +283,7 @@ cmd_write_habit() {
 
   ensure_dir "$dir"
 
-  local content
-  content=$(cat)
+  local content="${3:-$(cat)}"
 
   local habit_file="$dir/$id.md"
   printf '%s\n' "$content" | atomic_write_file "$habit_file"
@@ -301,25 +309,32 @@ cmd_log_exec() {
   local timestamp
   timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-  local override_val="null"
+  local jq_expr='.index = [.index[] | if .id == $id then .last_executed = $ts else . end]'
+
   if [ -n "$override" ]; then
+    local override_val
     override_val=$(printf '%s' "$override" | jq -R .)
+
+    local log_entry
+    log_entry=$(jq -n \
+      --arg id "$id" \
+      --argjson override "$override_val" \
+      --arg timestamp "$timestamp" \
+      --arg scope "$scope" \
+      '{id: $id, override: $override, timestamp: $timestamp, scope: $scope}')
+
+    update_state "$dir" jq --arg id "$id" --arg ts "$timestamp" --argjson entry "$log_entry" \
+      "$jq_expr | .log += [\$entry]"
+  else
+    update_state "$dir" jq --arg id "$id" --arg ts "$timestamp" "$jq_expr"
   fi
 
-  local log_entry
-  log_entry=$(jq -n \
-    --arg id "$id" \
-    --argjson override "$override_val" \
-    --arg timestamp "$timestamp" \
-    --arg scope "$scope" \
-    '{id: $id, override: $override, timestamp: $timestamp, scope: $scope}')
-
-  # Bump counter only if override was provided.
-  local bump=0
-  [ -n "$override" ] && bump=1
-
-  update_state "$dir" jq --argjson entry "$log_entry" --argjson bump "$bump" \
-    '.log += [$entry] | .meta.update_counter += $bump'
+  local habit_file="$dir/$id.md"
+  if [ -f "$habit_file" ]; then
+    sed '/^last_executed:/d' "$habit_file" \
+      | awk -v ts="$timestamp" 'BEGIN{n=0} /^---$/{n++; if(n==2) print "last_executed: " ts} {print}' \
+      | atomic_write_file "$habit_file"
+  fi
 
   echo "OK logged exec for $id"
 }
@@ -349,11 +364,8 @@ cmd_prune_log() {
 
   [ -d "$dir" ] || { echo "No habits directory for scope: $scope"; exit 0; }
 
-  local cutoff
-  cutoff=$(date -u -v-30d +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "30 days ago" +"%Y-%m-%dT%H:%M:%SZ")
-
-  update_state "$dir" jq --arg cutoff "$cutoff" \
-    '.log = [.log[] | select(.timestamp > $cutoff)] | .log = .log[-500:]'
+  update_state "$dir" jq --argjson retain "$LOG_RETAIN" \
+    '.log = .log[-$retain:]'
 
   echo "OK pruned log for $scope"
 }

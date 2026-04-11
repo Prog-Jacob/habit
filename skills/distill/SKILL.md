@@ -61,7 +61,7 @@ Session sweep followed by full inventory restructure.
    - Merge convergent habits (>80% overlap).
    - Normalize tags (`ts`→`typescript`, `js`→`javascript`).
    - Normalize identifiers (flag renames in summary).
-   - Archive stale (no executions + not updated 30+ days).
+   - Archive stale (`last_executed` is null or 30+ days ago, and not updated 30+ days).
    - Detect override patterns → create variants or update base.
    - Run `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh self-heal global` and `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh self-heal project` to rebuild indexes.
    - Reset meta: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-meta global` and `reset-meta project`.
