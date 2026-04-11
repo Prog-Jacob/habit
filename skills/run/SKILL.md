@@ -15,7 +15,7 @@ If triggers are not `none`, add after your response: "Habit maintenance availabl
 
 ## Habit Content
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit "$ARGUMENTS"`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit "$1"`
 
 ## Instructions
 
@@ -36,7 +36,7 @@ If triggers are not `none`, add after your response: "Habit maintenance availabl
 
 5. After execution, log it silently (the user should not see this):
    ```
-   bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-exec <scope> <id> [override text if any]
+   bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-exec <scope> <id> '<override if any>'
    ```
 
 No arguments -> `Usage: /habit:run <id> [overrides]`. Point to `/habit`.
