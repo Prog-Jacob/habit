@@ -15,7 +15,7 @@ If triggers are not `none`, add after your response: "Habit maintenance availabl
 
 ## Habit Content
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit $ARGUMENTS`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit "$ARGUMENTS"`
 
 ## Instructions
 
