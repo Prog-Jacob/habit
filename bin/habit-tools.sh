@@ -166,13 +166,10 @@ cmd_read_index() {
       read_state "$(resolve_dir "$scope")" | jq '{entries: .index}'
       ;;
     merged)
-      local global project
-      global=$(read_state "$GLOBAL_DIR" | jq '{entries: .index}')
-      project=$(read_state "$PROJECT_DIR" | jq '{entries: .index}')
       jq -n \
-        --argjson g "$global" \
-        --argjson p "$project" \
-        '{ entries: ([$g.entries[], $p.entries[]] | group_by(.id) | map(
+        --argjson g "$(read_state "$GLOBAL_DIR")" \
+        --argjson p "$(read_state "$PROJECT_DIR")" \
+        '{ entries: ([$g.index[], $p.index[]] | group_by(.id) | map(
           if length > 1 then (map(select(.scope == "project"))[0] // .[0]) else .[0] end
         )) }'
       ;;
@@ -247,23 +244,6 @@ cmd_read_watch_queue() {
 cmd_check_triggers() {
   local session_id="${1:-}"
 
-  local global_state project_state
-  global_state=$(read_state "$GLOBAL_DIR")
-  project_state=$(read_state "$PROJECT_DIR")
-
-  local gc pc
-  gc=$(echo "$global_state" | jq '.meta.update_counter // 0')
-  pc=$(echo "$project_state" | jq '.meta.update_counter // 0')
-
-  if [ "$gc" -ge "$QUEUE_THRESHOLD" ] || [ "$pc" -ge "$QUEUE_THRESHOLD" ]; then
-    echo "TRIGGERS: deep"
-    return
-  fi
-
-  local gl pl
-  gl=$(echo "$global_state" | jq '.log | length')
-  pl=$(echo "$project_state" | jq '.log | length')
-
   local qc=0
   if [ -n "$session_id" ]; then
     local queue
@@ -273,16 +253,24 @@ cmd_check_triggers() {
     fi
   fi
 
-  if [ "$gl" -ge "$LOG_TRIGGER" ] || [ "$pl" -ge "$LOG_TRIGGER" ] || [ "$qc" -ge "$QUEUE_THRESHOLD" ]; then
-    echo "TRIGGERS: distill"
-  else
-    echo "TRIGGERS: none"
-  fi
+  jq -n \
+    --argjson g "$(read_state "$GLOBAL_DIR")" \
+    --argjson p "$(read_state "$PROJECT_DIR")" \
+    --argjson qt "$QUEUE_THRESHOLD" \
+    --argjson lt "$LOG_TRIGGER" \
+    --argjson qc "$qc" \
+    'if ($g.meta.update_counter // 0) >= $qt or ($p.meta.update_counter // 0) >= $qt
+     then "TRIGGERS: deep"
+     elif ($g.log | length) >= $lt or ($p.log | length) >= $lt or $qc >= $qt
+     then "TRIGGERS: distill"
+     else "TRIGGERS: none" end' -r
 }
 
 cmd_read_log() {
-  read_state "$GLOBAL_DIR" | jq -c '.log[]' 2>/dev/null || true
-  read_state "$PROJECT_DIR" | jq -c '.log[]' 2>/dev/null || true
+  jq -n \
+    --argjson g "$(read_state "$GLOBAL_DIR")" \
+    --argjson p "$(read_state "$PROJECT_DIR")" \
+    '[$g.log[], $p.log[]] | .[]' -c
 }
 
 cmd_read_transcript() {
@@ -362,7 +350,7 @@ cmd_log_exec() {
 
   local habit_file="$dir/$id.md"
   if [ -f "$habit_file" ]; then
-    awk -v ts="$timestamp" '/^last_executed:/{next} /^---$/{n++; if(n==2) print "last_executed: " ts} {print}' "$habit_file" \
+    awk -v ts="$timestamp" '/^last_executed:/{next} /^---$/{n++; if(n==2) print "last_executed: "ts} {print}' "$habit_file" \
       | atomic_write_file "$habit_file"
   fi
 
