@@ -122,14 +122,44 @@ resolve_dir() {
   esac
 }
 
+# Parse --scope argument. Accepts "--scope <value>" or bare "<value>".
+# First arg is the default when nothing is provided.
+parse_scope_arg() {
+  local default="$1"; shift
+  local first="${1:---scope}"
+  local second="${2:-$default}"
+  [ "$first" = "--scope" ] && echo "$second" || echo "$first"
+}
+
+# Resolve scope to dir and verify it exists.
+# Returns dir path on stdout. Returns 1 if dir missing.
+require_scope_dir() {
+  local scope="$1"
+  local dir
+  dir=$(resolve_dir "$scope")
+  [ -d "$dir" ] || { echo "No habits directory for scope: $scope"; return 1; }
+  echo "$dir"
+}
+
+# Require a non-empty session id. Exit 1 with error if missing.
+require_session_id() {
+  [ -n "${1:-}" ] && return 0
+  echo "Error: session id required" >&2; exit 1
+}
+
+# UTC timestamp in ISO 8601.
+now_utc() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
+
+# Build session temp file path: /tmp/habit-<type>-<session_id>
+session_path() {
+  echo "/tmp/habit-$1-$2"
+}
+
 # --- Read Commands ---
 
 cmd_read_index() {
-  local scope="${1:---scope}"
-  local value="${2:-merged}"
-  if [ "$scope" = "--scope" ]; then
-    scope="$value"
-  fi
+  local scope
+  scope=$(parse_scope_arg "merged" "$@")
 
   case "$scope" in
     global|project)
@@ -151,11 +181,8 @@ cmd_read_index() {
 }
 
 cmd_read_meta() {
-  local scope="${1:---scope}"
-  local value="${2:-global}"
-  if [ "$scope" = "--scope" ]; then
-    scope="$value"
-  fi
+  local scope
+  scope=$(parse_scope_arg "global" "$@")
 
   local dir
   dir=$(resolve_dir "$scope")
@@ -166,7 +193,7 @@ cmd_read_habit() {
   local id="${1:-}"
   [ -z "$id" ] && { echo "NOT_FOUND"; echo "No id provided"; exit 0; }
 
-  id=$(echo "$id" | awk '{print $1}')
+  id="${id%% *}"
 
   if [ -f "$PROJECT_DIR/$id.md" ]; then
     echo "SCOPE:project"
@@ -184,44 +211,49 @@ cmd_read_habit() {
 cmd_read_watch_state() {
   local session_id="${1:-}"
   [ -z "$session_id" ] && { echo "INACTIVE"; exit 0; }
-  [ -f "/tmp/habit-watch-active-$session_id" ] && echo "ACTIVE" || echo "INACTIVE"
+  [ -f "$(session_path watch-active "$session_id")" ] && echo "ACTIVE" || echo "INACTIVE"
 }
 
 cmd_watch_start() {
-  local session_id="${1:-}"
-  [ -z "$session_id" ] && { echo "Error: session id required" >&2; exit 1; }
-  touch "/tmp/habit-watch-active-$session_id"
-  touch "/tmp/habit-watch-queue-$session_id"
+  require_session_id "${1:-}"
+  local session_id="$1"
+  touch "$(session_path watch-active "$session_id")"
+  touch "$(session_path watch-queue "$session_id")"
   echo "OK watch started"
 }
 
 cmd_watch_stop() {
-  local session_id="${1:-}"
-  [ -z "$session_id" ] && { echo "Error: session id required" >&2; exit 1; }
-  rm -f "/tmp/habit-watch-active-$session_id"
+  require_session_id "${1:-}"
+  local session_id="$1"
+  rm -f "$(session_path watch-active "$session_id")"
   echo "OK watch stopped"
 }
 
 cmd_clear_watch_queue() {
-  local session_id="${1:-}"
-  [ -z "$session_id" ] && { echo "Error: session id required" >&2; exit 1; }
-  : > "/tmp/habit-watch-queue-$session_id"
+  require_session_id "${1:-}"
+  local session_id="$1"
+  : > "$(session_path watch-queue "$session_id")"
   echo "OK queue cleared"
 }
 
 cmd_read_watch_queue() {
   local session_id="${1:-}"
   [ -z "$session_id" ] && { echo "No queued prompts."; exit 0; }
-  local queue="/tmp/habit-watch-queue-$session_id"
+  local queue
+  queue=$(session_path watch-queue "$session_id")
   [ -f "$queue" ] && [ -s "$queue" ] && cat "$queue" || echo "No queued prompts."
 }
 
 cmd_check_triggers() {
   local session_id="${1:-}"
 
+  local global_state project_state
+  global_state=$(read_state "$GLOBAL_DIR")
+  project_state=$(read_state "$PROJECT_DIR")
+
   local gc pc
-  gc=$(cmd_read_meta --scope global | jq '.update_counter // 0')
-  pc=$(cmd_read_meta --scope project | jq '.update_counter // 0')
+  gc=$(echo "$global_state" | jq '.meta.update_counter // 0')
+  pc=$(echo "$project_state" | jq '.meta.update_counter // 0')
 
   if [ "$gc" -ge "$QUEUE_THRESHOLD" ] || [ "$pc" -ge "$QUEUE_THRESHOLD" ]; then
     echo "TRIGGERS: deep"
@@ -229,12 +261,13 @@ cmd_check_triggers() {
   fi
 
   local gl pl
-  gl=$(read_state "$GLOBAL_DIR" | jq '.log | length')
-  pl=$(read_state "$PROJECT_DIR" | jq '.log | length')
+  gl=$(echo "$global_state" | jq '.log | length')
+  pl=$(echo "$project_state" | jq '.log | length')
 
   local qc=0
   if [ -n "$session_id" ]; then
-    local queue="/tmp/habit-watch-queue-$session_id"
+    local queue
+    queue=$(session_path watch-queue "$session_id")
     if [ -f "$queue" ] && [ -s "$queue" ]; then
       qc=$(grep -c "$QUEUE_SEPARATOR" "$queue" 2>/dev/null || echo "0")
     fi
@@ -261,7 +294,8 @@ cmd_read_transcript() {
   if [ -f "$arg" ]; then
     transcript_path="$arg"
   else
-    local path_file="/tmp/habit-transcript-$arg"
+    local path_file
+    path_file=$(session_path transcript "$arg")
     [ -f "$path_file" ] || { echo "No session data yet."; exit 0; }
     transcript_path=$(cat "$path_file")
     [ -f "$transcript_path" ] || { echo "No session data yet."; exit 0; }
@@ -307,32 +341,28 @@ cmd_log_exec() {
   ensure_dir "$dir"
 
   local timestamp
-  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  timestamp=$(now_utc)
 
   local jq_expr='.index = [.index[] | if .id == $id then .last_executed = $ts else . end]'
+  local jq_args=(--arg id "$id" --arg ts "$timestamp")
 
   if [ -n "$override" ]; then
-    local override_val
-    override_val=$(printf '%s' "$override" | jq -R .)
-
     local log_entry
     log_entry=$(jq -n \
       --arg id "$id" \
-      --argjson override "$override_val" \
+      --arg override "$override" \
       --arg timestamp "$timestamp" \
       --arg scope "$scope" \
       '{id: $id, override: $override, timestamp: $timestamp, scope: $scope}')
-
-    update_state "$dir" jq --arg id "$id" --arg ts "$timestamp" --argjson entry "$log_entry" \
-      "$jq_expr | .log += [\$entry]"
-  else
-    update_state "$dir" jq --arg id "$id" --arg ts "$timestamp" "$jq_expr"
+    jq_args+=(--argjson entry "$log_entry")
+    jq_expr="$jq_expr | .log += [\$entry]"
   fi
+
+  update_state "$dir" jq "${jq_args[@]}" "$jq_expr"
 
   local habit_file="$dir/$id.md"
   if [ -f "$habit_file" ]; then
-    sed '/^last_executed:/d' "$habit_file" \
-      | awk -v ts="$timestamp" 'BEGIN{n=0} /^---$/{n++; if(n==2) print "last_executed: " ts} {print}' \
+    awk -v ts="$timestamp" '/^last_executed:/{next} /^---$/{n++; if(n==2) print "last_executed: " ts} {print}' "$habit_file" \
       | atomic_write_file "$habit_file"
   fi
 
@@ -342,42 +372,30 @@ cmd_log_exec() {
 # --- Deep Distill Maintenance ---
 
 cmd_reset_meta() {
-  local scope="$1"
   local dir
-  dir=$(resolve_dir "$scope")
+  dir=$(require_scope_dir "$1") || { echo "$dir"; exit 0; }
 
-  [ -d "$dir" ] || { echo "No habits directory for scope: $scope"; exit 0; }
-
-  local timestamp
-  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-  update_state "$dir" jq --arg ts "$timestamp" \
+  update_state "$dir" jq --arg ts "$(now_utc)" \
     '.meta.update_counter = 0 | .meta.last_deep_timestamp = $ts'
 
-  echo "OK reset meta for $scope"
+  echo "OK reset meta for $1"
 }
 
 cmd_prune_log() {
-  local scope="$1"
   local dir
-  dir=$(resolve_dir "$scope")
-
-  [ -d "$dir" ] || { echo "No habits directory for scope: $scope"; exit 0; }
+  dir=$(require_scope_dir "$1") || { echo "$dir"; exit 0; }
 
   update_state "$dir" jq --argjson retain "$LOG_RETAIN" \
     '.log = .log[-$retain:]'
 
-  echo "OK pruned log for $scope"
+  echo "OK pruned log for $1"
 }
 
 # --- Self-Heal ---
 
 cmd_self_heal() {
-  local scope="$1"
   local dir
-  dir=$(resolve_dir "$scope")
-
-  [ -d "$dir" ] || { echo "No habits directory for scope: $scope"; exit 0; }
+  dir=$(require_scope_dir "$1") || { echo "$dir"; exit 0; }
 
   local entries_json
   entries_json=$(

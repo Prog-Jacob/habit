@@ -25,7 +25,7 @@ PROMPT=$(echo "$INPUT" | jq -r '.prompt // ""')
 
 # Heuristic filter: skip obvious non-reusable prompts
 WORDS=$(echo "$PROMPT" | wc -w | tr -d ' ')
-[ "$WORDS" -lt 7 ] && exit 0
+[ "$WORDS" -lt 5 ] && exit 0
 
 # Passed filter, queue for processing
 # Separator must match QUEUE_SEPARATOR in bin/habit-tools.sh
