@@ -13,7 +13,7 @@ allowed-tools: Bash(bash:*)
 
 ## Existing Habit (if any)
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit "$1"`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit "$0"`
 
 ## Processing Rules
 
