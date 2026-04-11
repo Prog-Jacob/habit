@@ -19,7 +19,7 @@ allowed-tools: Bash(bash:*)
 
 @${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/PROCESSING.md
 
-## Deactivate (`$ARGUMENTS` is `off`, `stop`, or `disable`)
+## Deactivate (`$ARGUMENTS` expresses intent to deactivate, e.g. off, stop, disable, pause, turn off)
 
 1. If Watch State above is `INACTIVE` → "Watch wasn't active." and stop.
 2. Stop collecting: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh watch-stop ${CLAUDE_SESSION_ID}`

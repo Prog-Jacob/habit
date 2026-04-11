@@ -11,7 +11,7 @@ All habit commands that create, modify, or inspect habits follow these rules. Do
 
 ## Operations
 
-All file operations go through `habit-tools.sh`. Never use the Read or Write tools on habit files directly.
+All habit data goes through `habit-tools.sh`. Try not to use Read, Write, Glob, or Grep on habit files directly. If you need data that isn't preloaded, call the appropriate command below.
 
 - **Read a habit:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id>`
 - **Write a habit:** pipe full content (frontmatter + body) to `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh write-habit <scope> <id>`
@@ -35,7 +35,7 @@ When capturing a habit from any source:
 
 Compare new candidate against existing habits by intent/outcome, not string matching. Use `read-habit <id>` to load existing habits for comparison.
 
-- **>80% overlap** → Skip. Tell user it's already covered.
+- **>80% overlap** → Skip. Tell user it's already covered. If the user actually shows intent, create it.
 - **50-80%** → Merge into existing. Preserve intent from both. Update `updated` timestamp.
 - **<50%, related domain** → Create new. Ensure tags distinguish them.
 

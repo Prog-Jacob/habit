@@ -19,13 +19,13 @@ If triggers are not `none`, add after your response: "Habit maintenance availabl
 
 ## Instructions
 
-1. Parse `$ARGUMENTS`: first token = id, rest = override (may be empty).
+1. Parse `$ARGUMENTS`: first token = id, rest = override (may be empty). The habit content is already loaded above.
 
 2. Parse the loaded content:
-   - **`NOT_FOUND`**: fuzzy-match the id against the index and suggest alternatives. Point to `/habit`.
+   - **`NOT_FOUND`**: if the user's intent is clear, load the intended habit via `read-habit`. Otherwise, suggest alternatives from the index and point to `/habit`.
    - **`SCOPE:<scope>`**: note the scope, extract the instruction body (everything after the YAML frontmatter `---` block).
 
-3. **With override (semantic integration):** identify what the override modifies (scope, target, behavior) and weave it into the appropriate parts of the instruction. The merged result must read as one coherent prompt.
+3. **With override (semantic integration):** weave it into the appropriate parts of the instruction. The merged result must read as one coherent prompt.
 
    Base: "Fix all TypeScript errors. Run tsc --noEmit. Fix file by file."
    Override: "only in auth module"
