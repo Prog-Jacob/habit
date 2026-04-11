@@ -27,7 +27,7 @@ allowed-tools: Bash(bash:*)
 4. If queue has prompts (separated by `---HABIT_SEPARATOR---` markers):
    - Classify each: reusable or one-off.
    - Apply the Processing Rules (interpretation, dedup, scope detection).
-   - Write each via `write-habit`.
+   - Write each via `write-habit` (see Processing Rules for the full command).
 5. Clear queue: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-watch-queue ${CLAUDE_SESSION_ID}`
 6. Print summary: created N, updated M. List ids.
 

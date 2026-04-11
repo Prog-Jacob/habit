@@ -22,7 +22,7 @@ If triggers are not `none`, add after your response: "Habit maintenance availabl
 1. Parse `$ARGUMENTS`: first token = id, rest = override (may be empty). The habit content is already loaded above.
 
 2. Parse the loaded content:
-   - **`NOT_FOUND`**: if the user's intent is clear, load the intended habit via `read-habit`. Otherwise, suggest alternatives from the index and point to `/habit`.
+   - **`NOT_FOUND`**: if the user's intent is clear, load the intended habit via `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id>`. Otherwise, suggest alternatives from the index and point to `/habit`.
    - **`SCOPE:<scope>`**: note the scope, extract the instruction body (everything after the YAML frontmatter `---` block).
 
 3. **With override (semantic integration):** weave it into the appropriate parts of the instruction. The merged result must read as one coherent prompt.

@@ -34,4 +34,4 @@ allowed-tools: Bash(bash:*)
 
 3. **Skip if only asking the user a question.** Otherwise: apply the Processing Rules above. Edit in the scope where it was found. To change scope, the user must explicitly request it.
 
-4. Write via `write-habit`, confirm: `Created habit \`id\` [tags] description. (scope)`or`Updated habit \`id\` what changed.`
+4. Write via `write-habit` (see Processing Rules for the full command), confirm: `Created habit \`id\` [tags] description. (scope)`or`Updated habit \`id\` what changed.`
