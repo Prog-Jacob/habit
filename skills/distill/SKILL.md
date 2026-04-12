@@ -8,7 +8,7 @@ allowed-tools: Bash(bash:*)
 
 # /habit:distill: Sweep & Restructure
 
-Runs in forked subagent. All data is pre-loaded below. Summaries must be human-friendly. Do not mention file names, counters, timestamps, or pruning stats.
+Runs in forked subagent. All data is pre-loaded below. Use only Bash commands from the Operations reference for writes. Summaries must be human-friendly. Do not mention file names, counters, timestamps, or pruning stats.
 
 ## Triggers
 
@@ -50,9 +50,8 @@ Runs in forked subagent. All data is pre-loaded below. Summaries must be human-f
 
 If triggers above show `deep`, chain to the deep flow below after completing these steps.
 
-1. Gather all prompt sources:
-   - Current session transcript (loaded above).
-   - For each pending session breadcrumb: read its transcript via `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <transcript_path>`.
+1. Gather all prompt sources (current session transcript and pending session list are already loaded above):
+   - For each entry in the pending list above, fetch its transcript: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <transcript_path>`.
 2. Classify each prompt: reusable or one-off.
 3. Apply the Processing Rules for interpretation, dedup, structuring.
 4. Check execution log for override patterns (3+ similar on same habit).

@@ -9,7 +9,7 @@ allowed-tools: Bash(bash:*)
 
 @${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/TRIGGERS.md
 
-## Habit Content
+## Habit Content (if any)
 
 !`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit "$0"`
 
