@@ -20,11 +20,11 @@ Runs in forked subagent. All data is pre-loaded below. Summaries must be human-f
 
 ## Current Index (merged)
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index --scope merged`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index merged`
 
-## Watch Queue (if active)
+## Pending Sessions (from prior sessions)
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-watch-queue ${CLAUDE_SESSION_ID}`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-pending-distill`
 
 ## Execution Log
 
@@ -32,31 +32,39 @@ Runs in forked subagent. All data is pre-loaded below. Summaries must be human-f
 
 ## Global Metadata
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-meta --scope global`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-meta global`
 
 ## Project Metadata
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-meta --scope project`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-meta project`
 
 ## Processing Rules
 
 @${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/PROCESSING.md
 
+## Operations
+
+@${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/OPERATIONS.md
+
 ## Regular (no arguments)
 
 If triggers above show `deep`, chain to the deep flow below after completing these steps.
 
-1. Classify each prompt above (transcript and watch queue): reusable or one-off.
-2. Apply the Processing Rules for interpretation, dedup, structuring.
-3. Check execution log for override patterns (3+ similar on same habit).
-4. Clear the watch queue: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-watch-queue ${CLAUDE_SESSION_ID}`.
-5. Return summary. Say "Merged X into Y", "Created new habit Z", "Skipped N messages (one-off)".
+1. Gather all prompt sources:
+   - Current session transcript (loaded above).
+   - For each pending session breadcrumb: read its transcript via `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <transcript_path>`.
+2. Classify each prompt: reusable or one-off.
+3. Apply the Processing Rules for interpretation, dedup, structuring.
+4. Check execution log for override patterns (3+ similar on same habit).
+5. Clear pending: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-pending-distill`.
+6. Reset prompt counter: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-prompt-count ${CLAUDE_SESSION_ID}`.
+7. Return summary. Say "Merged X into Y", "Created new habit Z", "Skipped N messages (one-off)".
 
 ## Deep (`$ARGUMENTS` is "deep")
 
 Session sweep followed by full inventory restructure.
 
-1. Run regular steps 1 to 4 above.
+1. Run regular steps 1 to 6 above.
 2. Restructure the full inventory:
    - Merge convergent habits (>80% overlap).
    - Normalize tags (`ts`→`typescript`, `js`→`javascript`).

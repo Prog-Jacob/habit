@@ -7,11 +7,7 @@ allowed-tools: Bash(bash:*)
 
 # /habit:run: Execute
 
-## Triggers
-
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
-
-If triggers are not `none`, add after your response: "Habit maintenance available. Run `/habit:distill` to process."
+@${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/TRIGGERS.md
 
 ## Habit Content
 

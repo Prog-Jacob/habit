@@ -1,38 +1,37 @@
 ---
 name: watch
-description: "Use when the user wants to start or stop automatic habit capture. Triggers on: watch my session, observe patterns, start capturing, automatic habit detection from conversation."
-argument-hint: "[off]"
+description: "Use when the user wants to check, pause, or resume automatic habit capture. Triggers on: watch status, stop watching, pause capture, resume capture."
+argument-hint: "[off|status]"
 allowed-tools: Bash(bash:*)
 ---
 
-# /habit:watch: Observation Toggle
+# /habit:watch: Observation Control
 
-## Triggers
+Watch is always active by default. This skill lets you pause, resume, or check status.
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
+@${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/TRIGGERS.md
 
 ## Watch State
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-watch-state ${CLAUDE_SESSION_ID}`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh watch status ${CLAUDE_SESSION_ID}`
 
-## Processing Rules
+## Prompt Count
 
-@${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/PROCESSING.md
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-prompt-count ${CLAUDE_SESSION_ID}`
 
-## Deactivate (`$ARGUMENTS` expresses intent to deactivate, e.g. off, stop, disable, pause, turn off)
+## Operations
 
-1. If Watch State above is `INACTIVE` → "Watch wasn't active." and stop.
-2. Stop collecting: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh watch-stop ${CLAUDE_SESSION_ID}`
-3. Read the queue: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-watch-queue ${CLAUDE_SESSION_ID}`
-4. If queue has prompts (separated by `---HABIT_SEPARATOR---` markers):
-   - Classify each: reusable or one-off.
-   - Apply the Processing Rules (interpretation, dedup, scope detection).
-   - Write each via `write-habit` (see Processing Rules for the full command).
-5. Clear queue: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-watch-queue ${CLAUDE_SESSION_ID}`
-6. Print summary: created N, updated M. List ids.
+@${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/OPERATIONS.md
 
-## Activate (no arguments)
+## Pause (`$ARGUMENTS` expresses intent to deactivate, e.g. off, stop, disable, pause, turn off)
 
-1. If Watch State above is `ACTIVE` → "Already watching." and stop.
-2. Start watch: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh watch-start ${CLAUDE_SESSION_ID}`
-3. Confirm: "Watching. I'll capture patterns as you work. Run `/habit:watch off` to stop and process."
+1. If Watch State is `PAUSED` -> "Watch is already paused." and stop.
+2. Pause: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh watch stop ${CLAUDE_SESSION_ID}`
+3. If Prompt Count > 0, suggest: "Run `/habit:distill` to process this session's patterns."
+4. Confirm: "Watch paused. Run `/habit:watch` to resume."
+
+## Resume or Status (no arguments or resume intent)
+
+1. If Watch State is `ACTIVE` -> "Watch is active. {Prompt Count} prompts captured this session." and stop.
+2. Resume: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh watch start ${CLAUDE_SESSION_ID}`
+3. Confirm: "Watch resumed."

@@ -9,11 +9,7 @@ allowed-tools: Bash(bash:*)
 
 This skill is the main entry point for the Habit system. Route based on what the user is asking for:
 
-## Triggers
-
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
-
-If triggers are not `none`, add after your response: "Habit maintenance available. Run `/habit:distill` to process."
+@${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/TRIGGERS.md
 
 ## Routing
 
@@ -27,7 +23,7 @@ If triggers are not `none`, add after your response: "Habit maintenance availabl
 
 ## Index (merged, project shadows global)
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index --scope merged`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index merged`
 
 ## Browse & Select
 
