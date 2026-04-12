@@ -1,12 +1,36 @@
 {
-  "description": "Lightweight prompt collector for habit:watch. Appends user prompts to a queue file when watch is active. Never blocks.",
+  "description": "Habit session lifecycle hooks. Auto-watch on every session, breadcrumb on end.",
   "hooks": {
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-watch-gate.sh",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh prompt-tick session_id transcript_path prompt",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh session-init session_id",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "clear|resume|logout|prompt_input_exit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh session-end session_id",
             "async": true
           }
         ]
