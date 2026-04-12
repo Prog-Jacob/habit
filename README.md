@@ -1,42 +1,75 @@
-# Habit: Intelligent Prompt Inventory
+# Habit
 
-Habit observes how you work, captures your repeated patterns into structured prompts, and evolves the collection through a feedback loop driven by actual usage.
+A Claude Code plugin that turns the way you work into reusable prompts. It watches your sessions, extracts patterns, and builds an inventory that improves over time.
 
 ## Install
 
 ```
 /plugin marketplace add https://github.com/Prog-Jacob/habit.git
+```
+
+Then:
+
+```
 /plugin install habit@habit
+```
+
+## Quick Start
+
+Habit watches every session automatically. Use Claude Code normally. After enough prompts, it suggests running `/habit:distill` to extract reusable patterns.
+
+Create a habit directly:
+
+```
+/habit:edit fix-types Fix all TypeScript errors, file by file, using tsc --noEmit
+```
+
+Run one with an override:
+
+```
+/habit:run fix-types only in the auth module
+```
+
+The override is woven into the instruction semantically, not appended to the end.
+
+Browse the full inventory:
+
+```
+/habit
 ```
 
 ## Commands
 
-| Command                          | What it does                                   |
-| -------------------------------- | ---------------------------------------------- |
-| `/habit`                         | Browse, search, and select from your inventory |
-| `/habit:run <id> [override]`     | Execute a habit, optionally with added context |
-| `/habit:edit <id> [description]` | Create or update a habit                       |
-| `/habit:watch`                   | Start observing the session for patterns       |
-| `/habit:watch off`               | Stop observing and process captured patterns   |
-| `/habit:distill`                 | Sweep current session for reusable patterns    |
-| `/habit:distill deep`            | Full inventory restructure and cleanup         |
+| Command                          | What it does                                                                                                                                          |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/habit [query]`                 | Browse and search the inventory. Pick by number or name to run.                                                                                       |
+| `/habit:run <id> [override]`     | Execute a habit. The override narrows or modifies the instruction for this run.                                                                       |
+| `/habit:edit <id> [description]` | Create or update a habit. Without a description, shows current content.                                                                               |
+| `/habit:distill`                 | Sweep the current session and any unprocessed prior sessions for reusable patterns. Deduplicates, merges, and skips one-off messages.                 |
+| `/habit:distill deep`            | Full inventory restructure on top of a regular distill: merge overlapping habits, normalize tags, archive stale entries, promote recurring overrides. |
+| `/habit:watch`                   | Check observation status and prompt count for the current session.                                                                                    |
+| `/habit:watch off`               | Pause observation for this session. Resumes automatically next session.                                                                               |
 
 ## How It Works
 
-**Capture.** Create habits explicitly with `/habit:edit`, or let the system find them with `/habit:watch` and `/habit:distill`.
-
-**Execute.** Run habits with `/habit:run`. Overrides like "only in auth module" are woven into the instruction semantically, not appended blindly.
-
-**Evolve.** Every override is a signal. When the system detects repeated overrides (3+), it creates new habit variants or updates the base habit automatically during `/habit:distill deep`.
+1. **Session hooks** track every session automatically. On start, a session is registered. On each prompt, a counter increments. On end, a breadcrumb is saved for later processing.
+2. **Distill** reads the current session transcript plus any saved breadcrumbs from prior sessions. It classifies prompts as reusable or one-off, deduplicates against existing habits, and writes new or merged entries.
+3. **Overrides** are logged every time you run a habit with extra context. When `/habit:distill deep` detects 3+ similar overrides on the same habit, it either creates a scoped variant (e.g., `fix-types-auth`) or updates the base habit.
+4. **Triggers** surface maintenance suggestions at the right time. After enough prompts or accumulated changes, skill invocations will note that distill is available.
 
 ## Scope
 
-Habits can be **global** (`~/.claude/habits/`) or **project-scoped** (`.claude/habits/`). Scope is auto-detected based on whether the instruction references project-specific paths. Project habits shadow global ones with the same name.
+Habits live in one of two directories:
+
+- **Global**: `~/.claude/habits/`. Default for generic instructions.
+- **Project**: `.claude/habits/`. Used when the instruction references project paths or config.
+
+Project habits shadow global ones with the same id in the merged index.
 
 ## Storage
 
-All human-readable and portable. Markdown habits with YAML frontmatter, JSON state file per scope (`settings.local.json`).
+Each habit is a Markdown file with YAML frontmatter. Session and index state is tracked in `settings.local.json` per scope. Everything is human-readable and version-controllable.
 
 ## Uninstall
 
-Remove through Claude Code's plugin manager. Habit data at `~/.claude/habits/` is preserved. To remove data too: `rm -rf ~/.claude/habits/`
+Remove through Claude Code's plugin manager. Habit data in `~/.claude/habits/` is preserved. To delete it: `rm -rf ~/.claude/habits/`
