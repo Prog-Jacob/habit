@@ -20,11 +20,12 @@ Read-only. Most are pre-loaded in skills that need them.
 - **Read execution log:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-log`
 - **Read pending sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-pending-distill`
 - **Read transcript:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <path>`
+- **Read all project sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-sessions`
 - **Read prompt count:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-prompt-count <session_id>`
 - **Reset prompt count:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-prompt-count <session_id>`
 - **Clear pending sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-pending-distill`
 - **Check triggers:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers <session_id>`
-- **Should deep:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh should-deep`
+- **Should pending:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh should-pending`
 
 ## Error handling
 
