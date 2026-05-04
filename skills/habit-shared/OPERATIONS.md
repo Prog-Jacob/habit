@@ -27,6 +27,16 @@ Read-only. Most are pre-loaded in skills that need them.
 - **Check triggers:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers <session_id>`
 - **Should pending:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh should-pending`
 
+## Observation commands
+
+During any operation, if you encounter friction that stems from the plugin itself, log it. These are signals every user would independently discover: a skill instruction that's ambiguous, a command that returns misleading output, routing that sends to the wrong skill, processing rules that miss an edge case, or transcript extraction that includes noise or drops real content.
+
+Do not log user preferences (those are habits), one-off environment issues, or general LLM limitations.
+
+- **Log observation:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-observation <session_id> '<signal>'`. Single-quote the signal.
+- **Read observations:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-observations`
+- **Clear observations:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-observations`
+
 ## Error handling
 
 If any command exits non-zero, stop and report the error to the user, unless the step explicitly says to skip failures.

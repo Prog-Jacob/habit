@@ -3,7 +3,7 @@
 PROJECT_DIR=".claude/habits"
 GLOBAL_DIR="$HOME/.claude/habits"
 STATE_FILE="settings.local.json"
-DEFAULT_STATE='{"index":[],"meta":{"update_counter":0,"last_deep_timestamp":null},"log":[],"sessions":{}}'
+DEFAULT_STATE='{"index":[],"meta":{"update_counter":0,"last_deep_timestamp":null},"log":[],"sessions":{},"observations":[]}'
 
 LOG_RETAIN=25
 LOG_TRIGGER=50
