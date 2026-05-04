@@ -23,6 +23,7 @@ This skill is the main entry point for the Habit system. Route based on what the
 - **Viewing full details** ("show me X", "what does X do") → guide to `/habit:edit <id>` (shows full content when no changes are provided).
 - **Creating or editing** → guide to `/habit:edit <id> <description>`.
 - **Running a specific habit** → guide to `/habit:run <id> [override]`.
+- **Applying relevant habits to a request** → guide to `/habit:suggest <request>`.
 - **Watching/observing** → guide to `/habit:watch`.
 - **Extracting/sweeping** → guide to `/habit:distill`.
 - **User asks what habits are or how the system works** → explain briefly and point to `/habit:edit` or `/habit:watch`.
