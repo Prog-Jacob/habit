@@ -26,8 +26,13 @@
 Requires [Claude Code](https://code.claude.com/docs/en/overview) and [jq](https://jqlang.github.io/jq/).
 
 ```
-/plugin marketplace add Prog-Jacob/habit
-/plugin install habit@prog-jacob-habit
+/plugin marketplace add https://github.com/Prog-Jacob/habit.git
+```
+
+Then:
+
+```
+/plugin install habit@habit
 ```
 
 ---
