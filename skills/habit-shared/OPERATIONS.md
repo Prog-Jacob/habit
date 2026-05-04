@@ -11,6 +11,25 @@ All habit data goes through `habit-tools.sh`. Do not use Read, Write, Glob, or G
 - **Reset meta (after deep distill):** zero the update counter and set last deep timestamp. `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-meta <scope>`
 - **Prune log (after deep distill):** truncate to last 25 entries. `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh prune-log <scope>`
 
+## Query commands
+
+Read-only. Most are pre-loaded in skills that need them.
+
+- **Read index:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index <merged|global|project>`
+- **Read metadata:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-meta <global|project>`
+- **Read execution log:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-log`
+- **Read pending sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-pending-distill`
+- **Read transcript:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <path>`
+- **Read prompt count:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-prompt-count <session_id>`
+- **Reset prompt count:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-prompt-count <session_id>`
+- **Clear pending sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-pending-distill`
+- **Check triggers:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers <session_id>`
+- **Should deep:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh should-deep`
+
+## Error handling
+
+If any command exits non-zero, stop and report the error to the user, unless the step explicitly says to skip failures.
+
 ## Habit File Format
 
 ```
@@ -29,7 +48,3 @@ last_executed: <ISO 8601, system-managed, preserve on edit>
 
 <structured instruction body>
 ```
-
-## Auto-Triggers
-
-Trigger flags are preloaded in the skill above. `none` means proceed normally. `pending`, `distill`, or `deep` means maintenance is available: after your primary task, suggest `/habit:distill` to the user. (Does not apply inside `/habit:distill`.)
