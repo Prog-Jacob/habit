@@ -21,12 +21,15 @@ case "$cmd" in
     source "$SCRIPT_DIR/lib/query.sh" ;;
   log-observation|read-observations|clear-observations)
     source "$SCRIPT_DIR/lib/observation.sh" ;;
+  read-shared)
+    cmd_read_shared() { cat "$SCRIPT_DIR/../skills/habit-shared/${1:?filename required}"; }
+    ;;
   self-heal|reset-meta|prune-log|clear-pending-distill)
     source "$SCRIPT_DIR/lib/frontmatter.sh"
     source "$SCRIPT_DIR/lib/maintenance.sh" ;;
   *)
     echo "Usage: habit-tools.sh <command> [args]" >&2
-    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-sessions, read-prompt-count, read-pending-distill, read-log, session-init, session-end, prompt-tick, watch, reset-prompt-count, clear-pending-distill, check-triggers, should-pending, write-habit, log-exec, self-heal, reset-meta, prune-log, log-observation, read-observations, clear-observations" >&2
+    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-sessions, read-prompt-count, read-pending-distill, read-log, read-shared, session-init, session-end, prompt-tick, watch, reset-prompt-count, clear-pending-distill, check-triggers, should-pending, write-habit, log-exec, self-heal, reset-meta, prune-log, log-observation, read-observations, clear-observations" >&2
     exit 1
     ;;
 esac

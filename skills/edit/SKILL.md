@@ -17,11 +17,11 @@ allowed-tools: Bash(bash:*)
 
 ## Processing Rules
 
-!`cat ${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/PROCESSING.md`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-shared PROCESSING.md`
 
 ## Operations
 
-!`cat ${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/OPERATIONS.md`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-shared OPERATIONS.md`
 
 ## Instructions
 
