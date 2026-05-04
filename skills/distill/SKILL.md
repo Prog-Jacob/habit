@@ -36,11 +36,11 @@ Runs in forked subagent. All data is pre-loaded below. Use only Bash commands fr
 
 ## Processing Rules
 
-!`cat ${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/PROCESSING.md`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-shared PROCESSING.md`
 
 ## Operations
 
-!`cat ${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/OPERATIONS.md`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-shared OPERATIONS.md`
 
 ## Sweep
 
@@ -78,15 +78,15 @@ If the current session transcript above is empty and the pending sessions list i
 
 1. Gather prompt sources (current session transcript is already loaded above). For each entry in the pending list, fetch its transcript: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <transcript_path>`. If the file no longer exists, skip it silently. If zero usable prompts remain after fetching, return "Nothing to extract yet." and stop.
 2. Run **Sweep** on gathered data.
-3. Run **Cleanup**.
-4. Return summary: "Merged [source] into [target]", "Created [habit-id]", "Skipped one-off messages."
-5. Run `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh should-pending`. If it returns "yes", continue to **Maintain step 2** below (the sweep and cleanup are already done).
+3. Run `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh should-pending`. If it returns "yes", continue to **Maintain step 2** below after Cleanup.
+4. Run **Cleanup**.
+5. Return summary: "Merged [source] into [target]", "Created [habit-id]", "Skipped one-off messages."
 
 ## Maintain (`$ARGUMENTS` is "maintain" or "pending" or "deep")
 
 Session sweep followed by full inventory restructure and plugin self-improvement.
 
-1. Run Regular steps 1-2 above. (When auto-chained from Regular step 5, skip this.)
+1. Run Regular steps 1-2 above. (When auto-chained from Regular step 3, skip this.)
 2. Run **Restructure**.
 3. Run **Self-improve**.
 4. Run **Cleanup**.
