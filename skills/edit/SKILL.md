@@ -25,6 +25,8 @@ allowed-tools: Bash(bash:*)
 
 ## Instructions
 
+Output: the confirmation message or the question to the user.
+
 1. Parse `$ARGUMENTS`: first token = id (lowercase, alphanumeric + hyphens, max 40 chars), rest = changes/description.
 
 2. The existing habit content is loaded above. If it starts with `SCOPE:<scope>`, the habit exists. If `NOT_FOUND`, it's a new habit.
@@ -36,8 +38,8 @@ allowed-tools: Bash(bash:*)
 | No      | Yes    | Create new habit from description                       |
 | No      | No     | Ask what this habit should do and stop (skip steps 3-4) |
 
-3. **Skip if only asking the user a question.** Otherwise: apply the Processing Rules above. Edit in the scope where it was found. To change scope, the user must explicitly request it.
+3. If the table action is "Ask what to change" or "Ask what this habit should do", skip steps 3 and 4 and ask the question. Otherwise apply the Processing Rules above. Edit in the scope where it was found. To change scope, the user must explicitly request it.
 
-4. Write via `write-habit` (see Operations for the full command), confirm: "Created habit [id] — [tags] [description]. (scope)" or "Updated habit [id] — what changed."
+4. Write via `write-habit` (see Operations for the full command), confirm: "Created habit [id]. Tags: [tags]. [description]. ([scope])." or "Updated habit [id]: what changed."
 
 5. Verify: run `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id>` and confirm the id, description, and tags match what you intended. If not, rewrite.

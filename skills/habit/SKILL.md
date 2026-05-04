@@ -13,6 +13,10 @@ This skill is the main entry point for the Habit system. Route based on what the
 
 !`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
 
+## Operations
+
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-shared OPERATIONS.md`
+
 ## Routing
 
 - **Browsing/searching/listing** → handle below.
@@ -21,7 +25,11 @@ This skill is the main entry point for the Habit system. Route based on what the
 - **Running a specific habit** → guide to `/habit:run <id> [override]`.
 - **Watching/observing** → guide to `/habit:watch`.
 - **Extracting/sweeping** → guide to `/habit:distill`.
-- **Discovery** → explain the habit system briefly and suggest `/habit:edit` or `/habit:watch`.
+- **User asks what habits are or how the system works** → explain briefly and point to `/habit:edit` or `/habit:watch`.
+
+After routing the user to another command, stop. Do not also execute the Browse & Select flow below.
+
+Output: the routing message or the browse list.
 
 ## Index (merged, project shadows global)
 

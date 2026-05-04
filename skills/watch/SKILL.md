@@ -25,19 +25,19 @@ Watch is always active by default. This skill lets you pause, resume, or check s
 
 Pick the first matching branch:
 
-1. `$ARGUMENTS` is empty, "status", or "resume" -> **Status/Resume** below.
-2. `$ARGUMENTS` expresses intent to deactivate (off, stop, disable, pause, turn off) -> **Pause** below.
-3. Otherwise -> **Status/Resume** below (default).
+1. `$ARGUMENTS` is empty, "status", or "resume" → **Status/Resume** below.
+2. `$ARGUMENTS` expresses intent to deactivate (off, stop, disable, pause, turn off) → **Pause** below.
+3. Otherwise → **Status/Resume** below (default).
 
 ## Status/Resume
 
-1. If Watch State is `ACTIVE` -> "Watch is active. {Prompt Count} prompts captured this session." If the Triggers section above is non-empty, include its message. Stop.
+1. If Watch State is `ACTIVE`: when Prompt Count is `0`, say "Watch is active. No prompts captured yet this session." Otherwise say "Watch is active. {Prompt Count} prompts captured this session." If the Triggers section above is non-empty, include its message. Stop.
 2. Resume: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh watch start ${CLAUDE_SESSION_ID}`
 3. Confirm: "Watch resumed."
 
 ## Pause
 
-1. If Watch State is `PAUSED` -> "Watch is already paused." and stop.
+1. If Watch State is `PAUSED` → "Watch is already paused." and stop.
 2. Pause: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh watch stop ${CLAUDE_SESSION_ID}`
 3. If Prompt Count > 0, suggest: "Run `/habit:distill` to process this session's patterns."
 4. Confirm: "Watch paused. Run `/habit:watch` to resume."

@@ -11,7 +11,7 @@ allowed-tools: Bash(bash:*)
 
 !`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
 
-## Habit Content (if any)
+## Existing Habit (if any)
 
 !`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit "$0"`
 
@@ -20,7 +20,7 @@ allowed-tools: Bash(bash:*)
 1. Parse `$ARGUMENTS`: first token = id, rest = override (may be empty). The habit content is already loaded above.
 
 2. Parse the loaded content:
-   - **`NOT_FOUND`**: if the user's intent is clear, load the intended habit via `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id>`. Otherwise, suggest alternatives from the index and point to `/habit`.
+   - **`NOT_FOUND`**: if the argument matches a habit id case-insensitively, load the intended habit via `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id>`. Otherwise, suggest alternatives from the index and point to `/habit`.
    - **`SCOPE:<scope>`**: note the scope, extract the instruction body (everything after the YAML frontmatter `---` block).
 
 3. **With override (semantic integration):** weave it into the appropriate parts of the instruction. The merged result must read as one coherent prompt.
@@ -37,4 +37,4 @@ allowed-tools: Bash(bash:*)
    bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-exec <scope> <id> '<override if any>'
    ```
 
-No arguments -> `Usage: /habit:run <id> [overrides]`. Point to `/habit`.
+No arguments → `Usage: /habit:run <id> [overrides]`. Point to `/habit`.
