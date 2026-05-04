@@ -14,6 +14,21 @@ cmd_read_log() {
     '[$g.log[], $p.log[]] | .[]' -c
 }
 
+# Extract clean user messages from a JSONL transcript file.
+# Filters system noise, trims whitespace, caps at 100 messages.
+_extract_user_messages() {
+  jq -rs '
+    [.[] | select(.type=="user") | .message.content
+     | if type == "string" then .
+       elif type == "array" then map(select(.type=="text") | .text) | join("\n")
+       else empty end
+     | gsub("^\\s+|\\s+$"; "")
+     | select(length > 0)
+     | select(test("^(<local-command|<command-|Base directory for this skill:|\\[Request interrupted)") | not)
+    ] | .[-100:] | join("\n")
+  ' "$1" 2>/dev/null
+}
+
 cmd_read_transcript() {
   require_jq
   local arg="${1:-}"
@@ -31,13 +46,31 @@ cmd_read_transcript() {
 
   [ -z "$transcript_path" ] && { echo "No session data yet."; exit 0; }
 
-  # Extract user messages. [-100:] caps context size in long sessions.
-  jq -s '[.[] | select(.type=="user")] | .[-100:] | .[] | .message.content | if type == "string" then . elif type == "array" then map(select(.type=="text") | .text) | join("\n") else empty end' "$transcript_path" 2>/dev/null || echo "No session data yet."
+  _extract_user_messages "$transcript_path" || echo "No session data yet."
 }
 
 cmd_read_pending_distill() {
   require_jq
   read_state "$GLOBAL_DIR" | jq '.meta.pending_sessions // []'
+}
+
+cmd_read_sessions() {
+  require_jq
+  local encoded_dir
+  encoded_dir=$(echo "$PWD" | tr '/' '-')
+  local project_dir="$HOME/.claude/projects/$encoded_dir"
+
+  [ -d "$project_dir" ] || { echo "No project sessions found."; exit 0; }
+
+  local found=0
+  for jsonl_file in "$project_dir"/*.jsonl; do
+    [ -f "$jsonl_file" ] || continue
+    [ "$found" -gt 0 ] && echo "---SESSION---"
+    _extract_user_messages "$jsonl_file"
+    found=$((found + 1))
+  done
+
+  [ "$found" -eq 0 ] && echo "No project sessions found."
 }
 
 cmd_check_triggers() {
@@ -69,7 +102,7 @@ cmd_check_triggers() {
    else "" end' -r
 }
 
-cmd_should_deep() {
+cmd_should_pending() {
   require_jq
   jq -n \
     --argjson g "$(read_state "$GLOBAL_DIR")" \

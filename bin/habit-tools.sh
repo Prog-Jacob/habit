@@ -17,14 +17,14 @@ case "$cmd" in
   read-index|read-habit|write-habit|log-exec)
     source "$SCRIPT_DIR/lib/frontmatter.sh"
     source "$SCRIPT_DIR/lib/habit.sh" ;;
-  read-meta|read-log|read-transcript|read-pending-distill|check-triggers|should-deep)
+  read-meta|read-log|read-transcript|read-sessions|read-pending-distill|check-triggers|should-pending)
     source "$SCRIPT_DIR/lib/query.sh" ;;
   self-heal|reset-meta|prune-log|clear-pending-distill)
     source "$SCRIPT_DIR/lib/frontmatter.sh"
     source "$SCRIPT_DIR/lib/maintenance.sh" ;;
   *)
     echo "Usage: habit-tools.sh <command> [args]" >&2
-    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-prompt-count, read-pending-distill, read-log, session-init, session-end, prompt-tick, watch, reset-prompt-count, clear-pending-distill, check-triggers, should-deep, write-habit, log-exec, self-heal, reset-meta, prune-log" >&2
+    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-sessions, read-prompt-count, read-pending-distill, read-log, session-init, session-end, prompt-tick, watch, reset-prompt-count, clear-pending-distill, check-triggers, should-pending, write-habit, log-exec, self-heal, reset-meta, prune-log" >&2
     exit 1
     ;;
 esac
