@@ -1,7 +1,7 @@
 <div align="center">
   <h1>Habit</h1>
 
-  <p>A <a href="https://code.claude.com/docs/en/plugins">Claude Code</a> plugin that observes how you work and distills reusable prompts from your sessions. Habits are Markdown files with YAML frontmatter: stored locally, version-controllable, executed with semantic overrides.</p>
+  <p>A <a href="https://code.claude.com/docs/en/plugins">Claude Code</a> plugin that observes how you work and distills reusable prompts from your sessions. Habits are Markdown files with YAML frontmatter: stored locally, version-controllable, executed with semantic overrides. Relevant habits are automatically surfaced when you ask for suggestions.</p>
 
   <p>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/Prog-Jacob/habit?style=for-the-badge&colorA=1e1e2e&colorB=cba6f7" alt="MIT License" /></a>
@@ -50,6 +50,14 @@ Habit observes every session through hooks. Use Claude Code normally. After enou
 
 Overrides are woven into the instruction semantically ("Fix all TypeScript errors **in the auth module**"), not appended to the end. If you use the same override 3+ times, distill detects the pattern and either creates a variant (`fix-types-auth`) or updates the base habit.
 
+**Apply relevant habits to a request:**
+
+```
+/habit:suggest refactor the auth module
+```
+
+Matches habits by tags and descriptions, merges their instructions, and addresses the request directly.
+
 **Browse the inventory:**
 
 ```
@@ -67,6 +75,7 @@ Pick by number or name. Add context to narrow a run (e.g., `1 only in auth`).
 | `/habit [query]`                 | Browse and search the inventory. Fuzzy-matches against id, tags, and description.                              |
 | `/habit:run <id> [override]`     | Execute a habit. Override modifies the instruction for this run and is logged.                                 |
 | `/habit:edit <id> [description]` | Create or update a habit. Without a description, shows current content.                                        |
+| `/habit:suggest <request>`       | Surface relevant habits for a request, merge their instructions, and address it directly.                      |
 | `/habit:distill`                 | Sweep the current session and any pending prior sessions. Classifies, deduplicates, writes or merges habits.   |
 | `/habit:distill maintain`        | Regular sweep plus full inventory restructure: merge convergent habits, normalize tags, archive stale entries. |
 | `/habit:distill project`         | Scan all project sessions and restructure the full inventory.                                                  |
@@ -79,7 +88,7 @@ Pick by number or name. Add context to narrow a run (e.g., `1 only in auth`).
 
 **Hooks** fire on every session. `SessionStart` registers the session. `UserPromptSubmit` increments a prompt counter (skips prompts under 5 words) and records the transcript path. `SessionEnd` saves a breadcrumb for later distill if any prompts were captured.
 
-**Distill** runs in a forked subagent. It preloads the current transcript, the merged habit index, pending sessions, execution log, and metadata. It classifies each prompt as reusable or one-off, deduplicates against existing habits, and writes new or merged entries. `maintain` adds a restructure pass. `project` scans all `.jsonl` session files for the current working directory.
+**Distill** runs in a forked subagent. It preloads the current transcript, the merged habit index, pending sessions, execution log, and metadata. It classifies each prompt as reusable or one-off, deduplicates against existing habits, and writes new or merged entries. `maintain` adds a restructure pass and processes plugin observations for self-improvement. `project` scans all `.jsonl` session files for the current working directory.
 
 **Scope.** Habits live in `~/.claude/habits/` (global) or `.claude/habits/` (project). Project habits shadow global ones with the same id.
 
