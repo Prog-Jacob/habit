@@ -68,7 +68,7 @@ Pick by number or name. Add context to narrow a run (e.g., `1 only in auth`).
 | `/habit:run <id> [override]`     | Execute a habit. Override modifies the instruction for this run and is logged.                                 |
 | `/habit:edit <id> [description]` | Create or update a habit. Without a description, shows current content.                                        |
 | `/habit:distill`                 | Sweep the current session and any pending prior sessions. Classifies, deduplicates, writes or merges habits.   |
-| `/habit:distill pending`         | Regular sweep plus full inventory restructure: merge convergent habits, normalize tags, archive stale entries. |
+| `/habit:distill maintain`        | Regular sweep plus full inventory restructure: merge convergent habits, normalize tags, archive stale entries. |
 | `/habit:distill project`         | Scan all project sessions and restructure the full inventory.                                                  |
 | `/habit:watch`                   | Check observation status and prompt count for the current session.                                             |
 | `/habit:watch off`               | Pause observation. Resumes automatically next session.                                                         |
@@ -79,7 +79,7 @@ Pick by number or name. Add context to narrow a run (e.g., `1 only in auth`).
 
 **Hooks** fire on every session. `SessionStart` registers the session. `UserPromptSubmit` increments a prompt counter (skips prompts under 5 words) and records the transcript path. `SessionEnd` saves a breadcrumb for later distill if any prompts were captured.
 
-**Distill** runs in a forked subagent. It preloads the current transcript, the merged habit index, pending sessions, execution log, and metadata. It classifies each prompt as reusable or one-off, deduplicates against existing habits, and writes new or merged entries. `pending` adds a restructure pass. `project` scans all `.jsonl` session files for the current working directory.
+**Distill** runs in a forked subagent. It preloads the current transcript, the merged habit index, pending sessions, execution log, and metadata. It classifies each prompt as reusable or one-off, deduplicates against existing habits, and writes new or merged entries. `maintain` adds a restructure pass. `project` scans all `.jsonl` session files for the current working directory.
 
 **Scope.** Habits live in `~/.claude/habits/` (global) or `.claude/habits/` (project). Project habits shadow global ones with the same id.
 

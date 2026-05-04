@@ -1,7 +1,7 @@
 ---
 name: distill
 description: "Use when the user wants to extract reusable patterns from their session, restructure the habit inventory, or scan all project sessions for patterns. Triggers on: distill, sweep session, extract patterns, clean up habits, inventory maintenance."
-argument-hint: "[pending | project]"
+argument-hint: "[maintain | project]"
 context: fork
 allowed-tools: Bash(bash:*)
 ---
@@ -60,10 +60,17 @@ Runs in forked subagent. All data is pre-loaded below. Use only Bash commands fr
 - Reset meta: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-meta global` and `reset-meta project`.
 - Prune log: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh prune-log global` and `prune-log project`.
 
+## Self-improve
+
+Read observations: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-observations`. If none, skip.
+
+For each observation, identify the plugin source file responsible (under `${CLAUDE_PLUGIN_ROOT}/skills/` or `${CLAUDE_PLUGIN_ROOT}/bin/`). Read the file, apply the smallest edit that resolves the friction. Preserve existing structure and style.
+
 ## Cleanup
 
 1. Clear pending: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-pending-distill`.
-2. Reset prompt counter: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-prompt-count ${CLAUDE_SESSION_ID}`.
+2. Clear observations: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-observations`.
+3. Reset prompt counter: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-prompt-count ${CLAUDE_SESSION_ID}`.
 
 ## Regular (no arguments)
 
@@ -73,16 +80,17 @@ If the current session transcript above is empty and the pending sessions list i
 2. Run **Sweep** on gathered data.
 3. Run **Cleanup**.
 4. Return summary: "Merged [source] into [target]", "Created [habit-id]", "Skipped one-off messages."
-5. Run `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh should-pending`. If it returns "yes", continue to **Pending step 2** below (the sweep and cleanup are already done).
+5. Run `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh should-pending`. If it returns "yes", continue to **Maintain step 2** below (the sweep and cleanup are already done).
 
-## Pending (`$ARGUMENTS` is "pending")
+## Maintain (`$ARGUMENTS` is "maintain" or "pending" or "deep")
 
-Session sweep followed by full inventory restructure.
+Session sweep followed by full inventory restructure and plugin self-improvement.
 
-1. Run Regular steps 1–2 above. (When auto-chained from Regular step 5, skip this.)
+1. Run Regular steps 1-2 above. (When auto-chained from Regular step 5, skip this.)
 2. Run **Restructure**.
-3. Run **Cleanup**.
-4. Return combined summary.
+3. Run **Self-improve**.
+4. Run **Cleanup**.
+5. Return combined summary.
 
 ## Project (`$ARGUMENTS` is "project")
 
@@ -91,5 +99,6 @@ Scan all project sessions and restructure the full inventory. The preloaded tran
 1. Load all project sessions: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-sessions`. If it returns "No project sessions found.", return that message and stop.
 2. Run **Sweep** on loaded data.
 3. Run **Restructure**.
-4. Run **Cleanup**.
-5. Return summary: lead with what's new. "Scanned N sessions. Created [habit-id]. Merged [source] into [target]. Skipped one-off messages."
+4. Run **Self-improve**.
+5. Run **Cleanup**.
+6. Return summary: lead with what's new. "Scanned N sessions. Created [habit-id]. Merged [source] into [target]. Skipped one-off messages."
