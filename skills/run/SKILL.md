@@ -7,7 +7,9 @@ allowed-tools: Bash(bash:*)
 
 # /habit:run: Execute
 
-@${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/TRIGGERS.md
+## Triggers
+
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
 
 ## Habit Content (if any)
 
@@ -28,7 +30,7 @@ allowed-tools: Bash(bash:*)
    Right: "Fix all TypeScript errors **in the auth module**. Run tsc --noEmit **scoped to auth files**. Fix file by file."
    Wrong: "Fix all TypeScript errors. Run tsc --noEmit. Fix file by file. only in auth module."
 
-4. Execute directly. Just do the work as if the user typed the instruction. Do not announce what you're doing, explain the override merge, mention logging, or describe internal operations.
+4. Before executing, if the instruction names specific file paths, use the Read tool to verify they exist. If it names CLI tools not commonly installed, note this to the user. Then execute directly. Just do the work as if the user typed the instruction. Do not announce what you're doing, explain the override merge, mention logging, or describe internal operations.
 
 5. After execution, log it silently (the user should not see this):
    ```

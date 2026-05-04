@@ -9,7 +9,9 @@ allowed-tools: Bash(bash:*)
 
 Watch is always active by default. This skill lets you pause, resume, or check status. Watch State and Prompt Count below are already resolved.
 
-@${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/TRIGGERS.md
+## Triggers
+
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
 
 ## Watch State
 
@@ -29,7 +31,7 @@ Pick the first matching branch:
 
 ## Status/Resume
 
-1. If Watch State is `ACTIVE` -> "Watch is active. {Prompt Count} prompts captured this session." and stop.
+1. If Watch State is `ACTIVE` -> "Watch is active. {Prompt Count} prompts captured this session." If the Triggers section above is non-empty, include its message. Stop.
 2. Resume: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh watch start ${CLAUDE_SESSION_ID}`
 3. Confirm: "Watch resumed."
 

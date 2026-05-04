@@ -9,7 +9,9 @@ allowed-tools: Bash(bash:*)
 
 This skill is the main entry point for the Habit system. Route based on what the user is asking for:
 
-@${CLAUDE_PLUGIN_ROOT}/skills/habit-shared/TRIGGERS.md
+## Triggers
+
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
 
 ## Routing
 
