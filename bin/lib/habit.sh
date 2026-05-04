@@ -96,6 +96,4 @@ cmd_log_exec() {
     awk -v ts="$timestamp" 'NR<=20 && /^last_executed:/{next} NR<=20 && /^---$/{n++; if(n==2) print "last_executed: "ts} {print}' "$habit_file" \
       | atomic_write_file "$habit_file"
   fi
-
-  echo "OK logged exec for $id"
 }

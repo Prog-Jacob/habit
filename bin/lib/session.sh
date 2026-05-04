@@ -5,10 +5,15 @@ cmd_session_init() {
   require_session_id "${1:-}"
   local session_id="$1"
   ensure_dir "$GLOBAL_DIR"
-  update_state "$GLOBAL_DIR" jq --arg sid "$session_id" \
-    '.sessions[$sid] = ((.sessions[$sid] // {}) + {watch_paused: false})
+  local now
+  now=$(now_utc)
+  local cutoff
+  cutoff=$(date -u -v-24H +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d '24 hours ago' +"%Y-%m-%dT%H:%M:%SZ")
+  update_state "$GLOBAL_DIR" jq --arg sid "$session_id" --arg now "$now" --arg cutoff "$cutoff" \
+    '.sessions[$sid] = ((.sessions[$sid] // {}) + {watch_paused: false, init_time: $now})
      | .sessions[$sid].prompt_count = (.sessions[$sid].prompt_count // 0)
-     | .sessions[$sid].transcript_path = (.sessions[$sid].transcript_path // "")'
+     | .sessions[$sid].transcript_path = (.sessions[$sid].transcript_path // "")
+     | .sessions = (.sessions | to_entries | map(select(.key == $sid or (.value.init_time // "") >= $cutoff)) | from_entries)'
   echo "OK session initialized"
 }
 
@@ -30,7 +35,7 @@ cmd_session_end() {
     timestamp=$(now_utc)
     update_state "$GLOBAL_DIR" jq \
       --arg sid "$session_id" --arg tp "$tp" --argjson pc "$pc" --arg ts "$timestamp" \
-      '.meta.pending_sessions = ((.meta.pending_sessions // []) + [{session_id: $sid, transcript_path: $tp, prompt_count: $pc, timestamp: $ts}])
+      '.meta.pending_sessions = ([(.meta.pending_sessions // [])[] | select(.session_id != $sid)] + [{session_id: $sid, transcript_path: $tp, prompt_count: $pc, timestamp: $ts}])
        | del(.sessions[$sid])'
   else
     update_state "$GLOBAL_DIR" jq --arg sid "$session_id" 'del(.sessions[$sid])'
@@ -43,6 +48,7 @@ cmd_prompt_tick() {
   require_jq
   require_session_id "${1:-}"
   local session_id="$1"
+  ensure_dir "$GLOBAL_DIR"
   local transcript="${2:-}"
   local prompt="${3:-}"
 

@@ -63,10 +63,18 @@ cmd_check_triggers() {
     --argjson pc "$pc" \
     --argjson pending "$pending" \
     'if ($g.meta.update_counter // 0) >= $pt or ($p.meta.update_counter // 0) >= $pt
-     then "TRIGGERS: deep"
-     elif ($g.log | length) >= $lt or ($p.log | length) >= $lt or $pc >= $pt
-     then "TRIGGERS: distill"
-     elif $pending > 0
-     then "TRIGGERS: pending"
-     else "TRIGGERS: none" end' -r
+     or ($g.log | length) >= $lt or ($p.log | length) >= $lt or $pc >= $pt
+     or $pending > 0
+   then "Habit maintenance available. Run `/habit:distill` to process."
+   else "" end' -r
+}
+
+cmd_should_deep() {
+  require_jq
+  jq -n \
+    --argjson g "$(read_state "$GLOBAL_DIR")" \
+    --argjson p "$(read_state "$PROJECT_DIR")" \
+    --argjson pt "$PROMPT_THRESHOLD" \
+    'if ($g.meta.update_counter // 0) >= $pt or ($p.meta.update_counter // 0) >= $pt
+     then "yes" else "no" end' -r
 }
