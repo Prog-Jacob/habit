@@ -23,7 +23,6 @@ cmd_read_observations() {
 
 cmd_clear_observations() {
   require_jq
-  ensure_dir "$GLOBAL_DIR"
   update_state "$GLOBAL_DIR" jq '.observations = []'
   echo "OK observations cleared"
 }

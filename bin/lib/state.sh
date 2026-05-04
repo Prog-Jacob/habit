@@ -1,7 +1,6 @@
 # state.sh: Atomic JSON state read/write.
 
 read_state() {
-  require_jq
   local dir="$1"
   if [ -f "$dir/$STATE_FILE" ]; then
     cat "$dir/$STATE_FILE"
