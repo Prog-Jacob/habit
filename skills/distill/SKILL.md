@@ -44,11 +44,13 @@ Runs in forked subagent. All data is pre-loaded below. Use only Bash commands fr
 
 ## Routing
 
+Arguments: `$ARGUMENTS`
+
 Pick the first matching branch. Do not read or execute other branches.
 
-1. `$ARGUMENTS` is "project" → go to **Project** below.
-2. `$ARGUMENTS` is "maintain", "pending", or "deep" → go to **Maintain** below.
-3. No arguments → go to **Regular** below.
+1. Arguments line above contains "project" → go to **Project** below.
+2. Arguments line above contains "maintain", "pending", or "deep" → go to **Maintain** below.
+3. Arguments line above is empty → go to **Regular** below.
 
 ---
 
