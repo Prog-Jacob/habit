@@ -5,7 +5,7 @@ All habit data goes through `habit-tools.sh`. Do not use Read, Write, Glob, or G
 ## Commands
 
 - **Read a habit:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id>`
-- **Write a habit:** pipe full content (frontmatter + body) to `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh write-habit <scope> <id>`
+- **Write a habit:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh write-habit <scope> <id> '<frontmatter+body>'` (or pipe content via stdin)
 - **Log an execution:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-exec <scope> <id> '<override>'`. Always call after running a habit. Single-quote the override to prevent shell metacharacter interpretation. Without override, only updates `last_executed`. With override, also appends to the override log.
 - **Self-heal:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh self-heal <scope>`
 - **Reset meta (after deep distill):** zero the update counter and set last deep timestamp. `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-meta <scope>`
@@ -39,6 +39,10 @@ Do not log user preferences (those are habits), one-off environment issues, or g
 
 - **Log observation:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-observation <session_id> '<signal>'`. Single-quote the signal.
 - **Read observations:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-observations`
+
+## Output discipline
+
+User-facing output should be only the message itself. Do not mention internal operations, bash commands, or file paths.
 
 ## Error handling
 
