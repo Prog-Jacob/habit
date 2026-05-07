@@ -4,9 +4,9 @@ All habit data goes through `habit-tools.sh`. Do not use Read, Write, Glob, or G
 
 ## Commands
 
-- **Read a habit:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id>`
+- **Read habit(s):** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id> [<id2> ...]`. Single ID returns `SCOPE:<scope>` + content. Multiple IDs returns `---HABIT:<id>---` delimited sections.
 - **Write a habit:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh write-habit <scope> <id> '<frontmatter+body>'` (or pipe content via stdin)
-- **Log an execution:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-exec <scope> <id> '<override>'`. Always call after running a habit. Single-quote the override to prevent shell metacharacter interpretation. Without override, only updates `last_executed`. With override, also appends to the override log.
+- **Log execution:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-exec <scope> <id> '<override>'` for a single habit, or `bash ... log-exec '[{"scope":"...","id":"...","override":"..."}]'` for batch (one state write per scope).
 - **Self-heal:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh self-heal <scope>`
 - **Reset meta (after deep distill):** zero the update counter and set last deep timestamp. `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-meta <scope>`
 - **Prune log (after deep distill):** truncate to last 25 entries. `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh prune-log <scope>`
@@ -15,7 +15,7 @@ All habit data goes through `habit-tools.sh`. Do not use Read, Write, Glob, or G
 
 Read-only. Most are pre-loaded in skills that need them.
 
-- **Read index:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index <merged|global|project>`
+- **Read index:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index <merged|global|project> [active]`. With `active`: non-archived entries only, compact format (id, tags, description, scope).
 - **Read metadata:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-meta <global|project>`
 - **Read execution log:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-log`
 - **Read pending sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-pending-distill`
@@ -23,7 +23,6 @@ Read-only. Most are pre-loaded in skills that need them.
 - **Read all project sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-sessions` **(Only in distill Project branch. Forbidden in Maintain and Regular.)**
 - **Read prompt count:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-prompt-count <session_id>`
 - **Check triggers:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers <session_id>`
-- **Should pending:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh should-pending`
 
 ## Cleanup commands
 

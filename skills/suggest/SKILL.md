@@ -11,13 +11,9 @@ allowed-tools: Bash(bash:*)
 
 !`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
 
-## Index (merged)
+## Index (active)
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index merged`
-
-## Operations
-
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-shared OPERATIONS.md`
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index merged active`
 
 ## Instructions
 
@@ -27,13 +23,13 @@ allowed-tools: Bash(bash:*)
 
 3. If no habits are relevant, address the request directly without further ceremony.
 
-4. For each relevant habit (up to 5), load its full instruction: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id>`. The response starts with `SCOPE:<scope>`. Note the scope per habit for logging. Extract the instruction body after the YAML frontmatter.
+4. Load all relevant habits in one call: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id1> <id2> ...`. Output is delimited by `---HABIT:<id>---` lines. Each section starts with `SCOPE:<scope>`. Note the scope per habit for logging. Extract the instruction body after the YAML frontmatter.
 
 5. Merge the loaded instructions into a single directive for the request. Apply all habit instructions to the request. Where two instructions conflict, the more narrowly scoped one wins. Do not execute habits sequentially; synthesize one coherent action.
 
 6. Execute the merged directive. Address the request directly. Do not announce which habits are being applied, explain the merge, or describe internal operations.
 
-7. After execution, log each applied habit silently:
+7. After execution, log all applied habits in one call:
    ```
-   bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-exec <scope> <id> '<request summary, max 80 chars>'
+   bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-exec '[{"scope":"<scope>","id":"<id>","override":"<request summary, max 80 chars>"}, ...]'
    ```
