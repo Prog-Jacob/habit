@@ -3,7 +3,7 @@
 PROJECT_DIR=".claude/habits"
 GLOBAL_DIR="$HOME/.claude/habits"
 STATE_FILE="settings.local.json"
-DEFAULT_STATE='{"index":[],"meta":{"update_counter":0,"last_deep_timestamp":null},"log":[],"sessions":{},"observations":[]}'
+DEFAULT_STATE='{"index":[],"meta":{"update_counter":0,"last_deep_timestamp":null,"distilled_project_sessions":{}},"log":[],"sessions":{},"observations":[]}'
 
 LOG_RETAIN=25
 LOG_TRIGGER=50
@@ -38,3 +38,9 @@ require_session_id() {
 }
 
 now_utc() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
+
+if stat -f "%m" /dev/null &>/dev/null 2>&1; then
+  _file_mtime() { stat -f "%m" "$1"; }
+else
+  _file_mtime() { stat -c "%Y" "$1"; }
+fi

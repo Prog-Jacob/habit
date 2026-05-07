@@ -37,23 +37,30 @@ _extract_user_messages() {
   ' "$1" 2>/dev/null
 }
 
+_resolve_transcript_path() {
+  local arg="$1"
+  if [ -f "$arg" ]; then echo "$arg"; return 0; fi
+  local tp
+  tp=$(read_state "$GLOBAL_DIR" | jq -r --arg sid "$arg" '.sessions[$sid].transcript_path // ""')
+  [ -n "$tp" ] && [ -f "$tp" ] && { echo "$tp"; return 0; }
+  return 1
+}
+
 cmd_read_transcript() {
-  local arg="${1:-}"
-  [ -z "$arg" ] && { echo "No session data yet."; exit 0; }
+  [ $# -eq 0 ] && { echo "No session data yet."; exit 0; }
 
-  local transcript_path=""
-
-  if [ -f "$arg" ]; then
-    transcript_path="$arg"
+  if [ $# -eq 1 ]; then
+    local resolved
+    resolved=$(_resolve_transcript_path "$1") || { echo "No session data yet."; exit 0; }
+    _extract_user_messages "$resolved" || echo "No session data yet."
   else
-    local tp
-    tp=$(read_state "$GLOBAL_DIR" | jq -r --arg sid "$arg" '.sessions[$sid].transcript_path // ""')
-    [ -n "$tp" ] && [ -f "$tp" ] && transcript_path="$tp"
+    for arg in "$@"; do
+      local resolved
+      resolved=$(_resolve_transcript_path "$arg") || continue
+      echo "---SESSION:$resolved---"
+      _extract_user_messages "$resolved" || true
+    done
   fi
-
-  [ -z "$transcript_path" ] && { echo "No session data yet."; exit 0; }
-
-  _extract_user_messages "$transcript_path" || echo "No session data yet."
 }
 
 cmd_read_pending_distill() {
@@ -76,6 +83,31 @@ cmd_read_sessions() {
   done
 
   [ "$found" -eq 0 ] && echo "No project sessions found."
+}
+
+cmd_list_new_sessions() {
+  local encoded_dir
+  encoded_dir=$(echo "$PWD" | tr '/' '-')
+  local project_dir="$HOME/.claude/projects/$encoded_dir"
+
+  [ -d "$project_dir" ] || { echo "No project sessions found."; exit 0; }
+
+  local watermarks
+  watermarks=$(read_state "$GLOBAL_DIR" | jq -r '.meta.distilled_project_sessions // {}')
+
+  local new_count=0
+  for jsonl_file in "$project_dir"/*.jsonl; do
+    [ -f "$jsonl_file" ] || continue
+    local file_mtime stored_mtime
+    file_mtime=$(_file_mtime "$jsonl_file")
+    stored_mtime=$(echo "$watermarks" | jq -r --arg f "$jsonl_file" '.[$f] // ""')
+    if [ "$stored_mtime" != "$file_mtime" ]; then
+      echo "$jsonl_file"
+      new_count=$((new_count + 1))
+    fi
+  done
+
+  if [ "$new_count" -eq 0 ]; then echo "No new project sessions."; fi
 }
 
 cmd_check_triggers() {
