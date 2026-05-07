@@ -18,19 +18,26 @@ cmd_read_log() {
 # Filters system noise, trims whitespace, caps at 100 messages.
 _extract_user_messages() {
   jq -rs '
-    [.[] | select(.type=="user") | .message.content
-     | if type == "string" then .
-       elif type == "array" then map(select(.type=="text") | .text) | join("\n")
-       else empty end
-     | gsub("^\\s+|\\s+$"; "")
-     | select(length > 0)
-     | select(test("^(<local-command|<command-|Base directory for this skill:|\\[Request interrupted)") | not)
-    ] | .[-100:] | join("\n")
+    [.[] | select(.type=="user") |
+      {
+        ts: (.timestamp // "" | if . != "" then (split("T")[1] // "" | split(".")[0] // "" | .[0:5]) else "??:??" end),
+        text: (.message.content |
+          if type == "string" then .
+          elif type == "array" then [.[] | select(.type=="text") | .text] | join("\n")
+          else "" end)
+      }
+      | .text |= gsub("^\\s+|\\s+$"; "")
+      | select(.text | length > 0)
+      | select(.text | test("^(<local-command|<command-|Base directory for this skill:|\\[Request interrupted)") | not)
+    ] | .[-100:] | to_entries | map(
+      "[" + ((.key + 1) | tostring) + " | " + .value.ts
+      + (if (.value.text | test("habit|distill|plugin|/habit"; "i")) then " | plugin" else "" end)
+      + "]\n" + .value.text
+    ) | join("\n\n")
   ' "$1" 2>/dev/null
 }
 
 cmd_read_transcript() {
-  require_jq
   local arg="${1:-}"
   [ -z "$arg" ] && { echo "No session data yet."; exit 0; }
 
@@ -50,12 +57,10 @@ cmd_read_transcript() {
 }
 
 cmd_read_pending_distill() {
-  require_jq
   read_state "$GLOBAL_DIR" | jq '.meta.pending_sessions // []'
 }
 
 cmd_read_sessions() {
-  require_jq
   local encoded_dir
   encoded_dir=$(echo "$PWD" | tr '/' '-')
   local project_dir="$HOME/.claude/projects/$encoded_dir"
@@ -74,7 +79,6 @@ cmd_read_sessions() {
 }
 
 cmd_check_triggers() {
-  require_jq
   local session_id="${1:-}"
 
   local state
@@ -100,14 +104,4 @@ cmd_check_triggers() {
      or $pending > 0
    then "Habit maintenance available. Run `/habit:distill` to process."
    else "" end' -r
-}
-
-cmd_should_pending() {
-  require_jq
-  jq -n \
-    --argjson g "$(read_state "$GLOBAL_DIR")" \
-    --argjson p "$(read_state "$PROJECT_DIR")" \
-    --argjson pt "$PROMPT_THRESHOLD" \
-    'if ($g.meta.update_counter // 0) >= $pt or ($p.meta.update_counter // 0) >= $pt
-     then "yes" else "no" end' -r
 }

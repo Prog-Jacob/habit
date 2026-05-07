@@ -19,10 +19,6 @@ allowed-tools: Bash(bash:*)
 
 !`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-shared PROCESSING.md`
 
-## Operations
-
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-shared OPERATIONS.md`
-
 ## Instructions
 
 Output: the confirmation message or the question to the user.
@@ -40,6 +36,6 @@ Output: the confirmation message or the question to the user.
 
 3. If the table action is "Ask what to change" or "Ask what this habit should do", skip steps 3 and 4 and ask the question. Otherwise apply the Processing Rules above. Edit in the scope where it was found. To change scope, the user must explicitly request it.
 
-4. Write via `write-habit` (see Operations for the full command), confirm: "Created habit [id]. Tags: [tags]. [description]. ([scope])." or "Updated habit [id]: what changed."
+4. Write: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh write-habit <scope> <id> '<frontmatter+body>'`. Confirm: "Created habit [id]. Tags: [tags]. [description]. ([scope])." or "Updated habit [id]: what changed."
 
 5. Verify: run `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id>` and confirm the id, description, and tags match what you intended. If not, rewrite.

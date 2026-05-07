@@ -13,10 +13,6 @@ This skill is the main entry point for the Habit system. Route based on what the
 
 !`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
 
-## Operations
-
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-shared OPERATIONS.md`
-
 ## Routing
 
 - **Browsing/searching/listing** → handle below.

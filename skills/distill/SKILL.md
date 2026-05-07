@@ -85,7 +85,7 @@ Data sources: the preloaded session transcript and pending sessions above. Do no
 1. If the current session transcript above is empty and the pending sessions list is empty, return "Nothing to extract yet." and stop.
 2. Gather prompt sources (current session transcript is already loaded above). For each entry in the pending list, fetch its transcript: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <transcript_path>`. If the file no longer exists, skip it silently. If zero usable prompts remain after fetching, return "Nothing to extract yet." and stop.
 3. Run **Sweep** on gathered data.
-4. Run `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh should-pending`. If it returns "yes", continue to **Maintain step 3** (skip step 5; Maintain ends with its own Cleanup).
+4. Check the preloaded Global Metadata above: if `update_counter >= 20` in either scope, continue to **Maintain step 3** (skip step 5; Maintain ends with its own Cleanup).
 5. Run **Cleanup**.
 6. Return summary per **Summary Format** below. Use the same opening line rule as Maintain.
 
