@@ -1,7 +1,6 @@
 # maintenance.sh: Index rebuilding, metadata reset, log pruning.
 
 cmd_clear_pending_distill() {
-  require_jq
   update_state "$GLOBAL_DIR" jq '.meta.pending_sessions = []'
   echo "OK pending cleared"
 }

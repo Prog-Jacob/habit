@@ -1,7 +1,6 @@
 # session.sh: Session lifecycle and watch control.
 
 cmd_session_init() {
-  require_jq
   require_session_id "${1:-}"
   local session_id="$1"
   ensure_dir "$GLOBAL_DIR"
@@ -18,7 +17,6 @@ cmd_session_init() {
 }
 
 cmd_session_end() {
-  require_jq
   require_session_id "${1:-}"
   local session_id="$1"
   ensure_dir "$GLOBAL_DIR"
@@ -45,7 +43,6 @@ cmd_session_end() {
 }
 
 cmd_prompt_tick() {
-  require_jq
   require_session_id "${1:-}"
   local session_id="$1"
   ensure_dir "$GLOBAL_DIR"
@@ -83,7 +80,6 @@ cmd_watch() {
       ;;
     status)
       [ -z "$session_id" ] && { echo "ACTIVE"; exit 0; }
-      require_jq
       local paused
       paused=$(read_state "$GLOBAL_DIR" | jq -r --arg sid "$session_id" '.sessions[$sid].watch_paused // false')
       [ "$paused" = "true" ] && echo "PAUSED" || echo "ACTIVE"
@@ -93,14 +89,12 @@ cmd_watch() {
 }
 
 cmd_read_prompt_count() {
-  require_jq
   local session_id="${1:-}"
   [ -z "$session_id" ] && { echo "0"; exit 0; }
   read_state "$GLOBAL_DIR" | jq -r --arg sid "$session_id" '.sessions[$sid].prompt_count // 0'
 }
 
 cmd_reset_prompt_count() {
-  require_jq
   require_session_id "${1:-}"
   update_state "$GLOBAL_DIR" jq --arg sid "$1" \
     '.sessions[$sid].prompt_count = 0'

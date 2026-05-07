@@ -1,7 +1,6 @@
 # observation.sh: Plugin self-improvement observation log.
 
 cmd_log_observation() {
-  require_jq
   local session_id="${1:-}"
   local signal="${2:-}"
   [ -z "$signal" ] && { echo "Error: signal required" >&2; exit 1; }
@@ -15,14 +14,12 @@ cmd_log_observation() {
 }
 
 cmd_read_observations() {
-  require_jq
   read_state "$GLOBAL_DIR" | jq -r '
     (.observations // []) | if length == 0 then "No observations."
     else to_entries[] | "\(.key + 1). [\(.value.timestamp)] \(.value.signal)" end'
 }
 
 cmd_clear_observations() {
-  require_jq
   update_state "$GLOBAL_DIR" jq '.observations = []'
   echo "OK observations cleared"
 }

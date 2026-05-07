@@ -32,7 +32,6 @@ parse_frontmatter() {
 
 # Build a JSON index entry from a habit .md file.
 build_index_entry() {
-  require_jq
   local file="$1"
   parse_frontmatter "$file"
 

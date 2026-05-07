@@ -8,6 +8,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 source "$SCRIPT_DIR/lib/state.sh"
+require_jq
 
 cmd="${1:-}"; shift || true
 
@@ -17,7 +18,7 @@ case "$cmd" in
   read-index|read-habit|write-habit|log-exec)
     source "$SCRIPT_DIR/lib/frontmatter.sh"
     source "$SCRIPT_DIR/lib/habit.sh" ;;
-  read-meta|read-log|read-transcript|read-sessions|read-pending-distill|check-triggers|should-pending)
+  read-meta|read-log|read-transcript|read-sessions|read-pending-distill|check-triggers)
     source "$SCRIPT_DIR/lib/query.sh" ;;
   log-observation|read-observations|clear-observations)
     source "$SCRIPT_DIR/lib/observation.sh" ;;
@@ -29,7 +30,7 @@ case "$cmd" in
     source "$SCRIPT_DIR/lib/maintenance.sh" ;;
   *)
     echo "Usage: habit-tools.sh <command> [args]" >&2
-    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-sessions, read-prompt-count, read-pending-distill, read-log, read-shared, session-init, session-end, prompt-tick, watch, reset-prompt-count, clear-pending-distill, check-triggers, should-pending, write-habit, log-exec, self-heal, reset-meta, prune-log, log-observation, read-observations, clear-observations" >&2
+    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-sessions, read-prompt-count, read-pending-distill, read-log, read-shared, session-init, session-end, prompt-tick, watch, reset-prompt-count, clear-pending-distill, check-triggers, write-habit, log-exec, self-heal, reset-meta, prune-log, log-observation, read-observations, clear-observations" >&2
     exit 1
     ;;
 esac
