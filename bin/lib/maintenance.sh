@@ -43,3 +43,16 @@ cmd_self_heal() {
 
   echo "OK rebuilt index with $count entries"
 }
+
+cmd_mark_sessions_distilled() {
+  local watermarks="{}"
+  for f in "$@"; do
+    [ -f "$f" ] || continue
+    local mtime
+    mtime=$(_file_mtime "$f")
+    watermarks=$(echo "$watermarks" | jq --arg f "$f" --arg m "$mtime" '.[$f] = $m')
+  done
+  update_state "$GLOBAL_DIR" jq --argjson w "$watermarks" \
+    '.meta.distilled_project_sessions = ((.meta.distilled_project_sessions // {}) + $w)'
+  echo "OK marked $(echo "$watermarks" | jq 'length') sessions"
+}
