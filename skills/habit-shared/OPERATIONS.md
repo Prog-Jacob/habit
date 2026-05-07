@@ -19,8 +19,9 @@ Read-only. Most are pre-loaded in skills that need them.
 - **Read metadata:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-meta <global|project>`
 - **Read execution log:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-log`
 - **Read pending sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-pending-distill`
-- **Read transcript:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <path>`
+- **Read transcript:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <path> [<path2> ...]`. Single path returns content directly. Multiple paths returns `---SESSION:<path>---` delimited sections (skips missing files).
 - **Read all project sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-sessions` **(Only in distill Project branch. Forbidden in Maintain and Regular.)**
+- **List new sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh list-new-sessions`. Returns file paths of new or modified project sessions (not yet distilled or modified since last distill). **(Only in distill Project branch.)**
 - **Read prompt count:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-prompt-count <session_id>`
 - **Check triggers:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers <session_id>`
 
@@ -28,6 +29,7 @@ Read-only. Most are pre-loaded in skills that need them.
 
 - **Reset prompt count:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-prompt-count <session_id>`
 - **Clear pending sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-pending-distill`
+- **Mark sessions distilled:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh mark-sessions-distilled <path1> [<path2> ...]`. Records file mtimes as watermarks for incremental project distill.
 - **Clear observations:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-observations`
 
 ## Observation commands

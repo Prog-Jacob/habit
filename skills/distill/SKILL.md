@@ -48,7 +48,7 @@ Arguments: `$ARGUMENTS`
 
 **Before routing:** If the arguments contain feedback about the plugin beyond the routing keyword (complaints, questions about behavior, suggestions), log each piece as an observation before proceeding: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-observation ${CLAUDE_SESSION_ID} '<feedback>'`.
 
-Pick the first matching branch. Do not read or execute other branches. **Only the Project branch may call `read-sessions`.** Maintain and Regular work exclusively with the data already preloaded above.
+Pick the first matching branch. Do not read or execute other branches. **Only the Project branch may call `list-new-sessions` and `read-sessions`.** Maintain and Regular work exclusively with the data already preloaded above.
 
 1. Arguments line above contains "project" → go to **Project** below.
 2. Arguments line above contains "maintain", "pending", or "deep" → go to **Maintain** below.
@@ -58,21 +58,22 @@ Pick the first matching branch. Do not read or execute other branches. **Only th
 
 ## Project
 
-Scan all project sessions and restructure the full inventory. Ignore the preloaded session transcript above; all session data is loaded fresh here.
+Scan new or modified project sessions incrementally and restructure the full inventory. Ignore the preloaded session transcript above; all session data is loaded fresh here.
 
-1. Load all project sessions: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-sessions`. If it returns "No project sessions found.", return that message and stop.
-2. Run **Sweep** on loaded data.
-3. Run **Restructure**.
-4. Run **Self-improve**.
-5. Run **Cleanup**.
-6. Return summary per **Summary Format** below. Opening line: "Scanned N project sessions."
+1. List new/modified sessions: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh list-new-sessions`. If it returns "No new project sessions." or "No project sessions found.", return that message and stop.
+2. Collect the file paths from the output (one per line). Split into batches of 5.
+3. For each batch, load transcripts: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <path1> <path2> ... <path5>`. Run **Sweep** on the batch data. After each batch, mark processed: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh mark-sessions-distilled <path1> ... <path5>`.
+4. Run **Restructure**.
+5. Run **Self-improve**.
+6. Run **Cleanup**.
+7. Return summary per **Summary Format** below. Opening line: "Scanned N new project sessions." (Batch size: 5 transcripts per read-transcript call. Adjustable based on session length.)
 
 ## Maintain
 
 Session sweep followed by full inventory restructure and plugin self-improvement. Data sources: the preloaded session transcript and pending sessions above. Do not call `read-sessions` or load sessions by any other means.
 
 1. If the current session transcript above is empty and the pending sessions list is empty, skip to step 3.
-2. Gather prompt sources (current session transcript is already loaded above). For each entry in the pending list, fetch its transcript: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <transcript_path>`. If the file no longer exists, skip it silently. Run **Sweep** on gathered data if any usable prompts exist.
+2. Gather prompt sources (current session transcript is already loaded above). Collect all transcript paths from the pending list. Fetch them in one call: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <path1> <path2> ...`. Missing files are skipped automatically. Run **Sweep** on gathered data (current session + pending transcripts) if any usable prompts exist.
 3. Run **Restructure**.
 4. Run **Self-improve**.
 5. Run **Cleanup**.
@@ -83,7 +84,7 @@ Session sweep followed by full inventory restructure and plugin self-improvement
 Data sources: the preloaded session transcript and pending sessions above. Do not call `read-sessions` or load sessions by any other means.
 
 1. If the current session transcript above is empty and the pending sessions list is empty, return "Nothing to extract yet." and stop.
-2. Gather prompt sources (current session transcript is already loaded above). For each entry in the pending list, fetch its transcript: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <transcript_path>`. If the file no longer exists, skip it silently. If zero usable prompts remain after fetching, return "Nothing to extract yet." and stop.
+2. Gather prompt sources (current session transcript is already loaded above). Collect all transcript paths from the pending list. Fetch them in one call: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <path1> <path2> ...`. Missing files are skipped automatically. If zero usable prompts remain after fetching, return "Nothing to extract yet." and stop.
 3. Run **Sweep** on gathered data.
 4. Check the preloaded Global Metadata above: if `update_counter >= 20` in either scope, continue to **Maintain step 3** (skip step 5; Maintain ends with its own Cleanup).
 5. Run **Cleanup**.
