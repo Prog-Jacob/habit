@@ -32,7 +32,12 @@ case "$EVENT" in
     SID="$(_sid)"; [ -z "$SID" ] && exit 0
     PROMPT="$(_field prompt)"; [ -z "$PROMPT" ] && exit 0
     TRANSCRIPT="$(_field transcript_path)"
-    [ -z "$TRANSCRIPT" ] && TRANSCRIPT="$(cursor_transcript_path "${PWD:-$HOME}" 2>/dev/null || echo "")"
+    # Fallback for hosts that omit transcript_path. Cursor user-hooks run from
+    # ~/.cursor/, so derive the workspace from the payload, not $PWD.
+    if [ -z "$TRANSCRIPT" ]; then
+      WS="$(echo "$INPUT" | jq -r '.workspace_roots[0] // ""' 2>/dev/null || echo "")"
+      TRANSCRIPT="$(cursor_transcript_path "${WS:-${PWD:-$HOME}}" 2>/dev/null || echo "")"
+    fi
     bash "$HABIT_BIN" prompt-tick "$SID" "$TRANSCRIPT" "$PROMPT" >/dev/null 2>&1 || true
     ;;
   session-end)
