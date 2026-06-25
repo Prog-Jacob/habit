@@ -7,7 +7,6 @@ DEFAULT_STATE='{"index":[],"meta":{"update_counter":0,"last_deep_timestamp":null
 
 LOG_RETAIN=25
 LEARN_RETAIN=40
-LOG_TRIGGER=50
 PROMPT_THRESHOLD=20
 
 require_jq() {

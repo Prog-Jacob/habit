@@ -153,25 +153,26 @@ cmd_check_triggers() {
 
   local state
   state=$(read_state "$GLOBAL_DIR")
+
+  # Coerce to an integer in jq: a corrupt non-numeric prompt_count would
+  # otherwise abort the bash `-ge` test under `set -euo pipefail`.
   local pc=0
   if [ -n "$session_id" ]; then
-    pc=$(echo "$state" | jq -r --arg sid "$session_id" '.sessions[$sid].prompt_count // 0')
+    pc=$(echo "$state" | jq -r --arg sid "$session_id" \
+      '.sessions[$sid].prompt_count // 0 | if type == "number" then . else 0 end')
   fi
 
   local pending
   pending=$(echo "$state" | jq -r '(.meta.pending_sessions // []) | length')
-  [ "$pending" -gt 0 ] && pending=1 || pending=0
 
-  jq -n \
-    --argjson g "$state" \
-    --argjson p "$(read_state "$PROJECT_DIR")" \
-    --argjson pt "$PROMPT_THRESHOLD" \
-    --argjson lt "$LOG_TRIGGER" \
-    --argjson pc "$pc" \
-    --argjson pending "$pending" \
-    'if ($g.meta.update_counter // 0) >= $pt or ($p.meta.update_counter // 0) >= $pt
-     or ($g.log | length) >= $lt or ($p.log | length) >= $lt or $pc >= $pt
-     or $pending > 0
-   then "Habit maintenance available. Run `/habit:distill` to process."
-   else "" end' -r
+  # T2: the trigger means exactly "there is unprocessed input." It fires when the
+  # current session crossed the prompt threshold, prior sessions are pending, or
+  # new project sessions await a sweep. Write counter and raw log length are not
+  # nags (the log is bounded every distill; see distill Cleanup).
+  local has_new=0
+  [ "$(cmd_list_new_sessions)" = "No new project sessions." ] || has_new=1
+
+  if [ "$pc" -ge "$PROMPT_THRESHOLD" ] || [ "$pending" -gt 0 ] || [ "$has_new" -eq 1 ]; then
+    echo "Habit maintenance available. Run \`/habit:distill\` to process."
+  fi
 }
