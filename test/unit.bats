@@ -213,3 +213,40 @@ JSONL
   refute_contains "<timestamp>" "$output"
   refute_contains "user_query" "$output"
 }
+
+@test "cmd_write_habit writes the file and indexes it from its frontmatter" {
+  run cmd_write_habit global new-habit "$(cat << 'MD'
+---
+id: new-habit
+tags: [alpha, beta]
+description: A freshly written habit.
+scope: global
+created: 2026-06-01T00:00:00Z
+updated: 2026-06-01T00:00:00Z
+archived: false
+---
+
+## Instruction
+
+Do the thing.
+MD
+)"
+  assert_contains "OK wrote" "$output"
+
+  run cmd_read_habit new-habit
+  assert_contains "SCOPE:global" "$output"
+  assert_contains "Do the thing." "$output"
+
+  local entry
+  entry=$(jq -c '.index[] | select(.id=="new-habit")' "$TEST_GLOBAL/settings.local.json")
+  assert_contains '"description":"A freshly written habit."' "$entry"
+  assert_contains '"alpha"' "$entry"
+  assert_contains '"beta"' "$entry"
+  assert_contains '"archived":false' "$entry"
+}
+
+@test "cmd_write_habit rejects an invalid id" {
+  run cmd_write_habit global "Bad ID" "anything"
+  [ "$status" -ne 0 ]
+  assert_contains "Invalid id" "$output"
+}

@@ -156,6 +156,82 @@ load test_helper
   [ "$n" -eq 1 ]
 }
 
+@test "session-end promotes a counted session to pending and drops the live session" {
+  local home="$BATS_TEST_TMPDIR/se"
+  mkdir -p "$home/.claude/habits"
+  local tp="$home/t.jsonl"
+  echo '{"type":"user","message":{"content":"a real prompt with several words"}}' > "$tp"
+  HOME="$home" bash "$TOOLS" session-init sess-A >/dev/null
+  HOME="$home" bash "$TOOLS" prompt-tick sess-A "$tp" "a real prompt with several words" >/dev/null
+  HOME="$home" bash "$TOOLS" session-end sess-A >/dev/null
+
+  local state="$home/.claude/habits/settings.local.json"
+  [ "$(jq '[.meta.pending_sessions[] | select(.session_id=="sess-A")] | length' "$state")" -eq 1 ]
+  [ "$(jq '.sessions["sess-A"] // "gone"' "$state")" = '"gone"' ]
+}
+
+@test "watch stop pauses prompt counting until watch start resumes it" {
+  local home="$BATS_TEST_TMPDIR/wp"
+  mkdir -p "$home/.claude/habits"
+  HOME="$home" bash "$TOOLS" session-init sess-B >/dev/null
+
+  HOME="$home" bash "$TOOLS" watch stop sess-B >/dev/null
+  HOME="$home" bash "$TOOLS" prompt-tick sess-B "" "a prompt with plenty of words here" >/dev/null
+  run bash -c "HOME='$home' bash '$TOOLS' read-prompt-count sess-B"
+  [ "$output" = "0" ]
+
+  HOME="$home" bash "$TOOLS" watch start sess-B >/dev/null
+  HOME="$home" bash "$TOOLS" prompt-tick sess-B "" "another prompt with plenty of words" >/dev/null
+  run bash -c "HOME='$home' bash '$TOOLS' read-prompt-count sess-B"
+  [ "$output" = "1" ]
+}
+
+@test "prune-learnings keeps at most LEARN_RETAIN entries" {
+  local home="$BATS_TEST_TMPDIR/lrn-bound"
+  mkdir -p "$home/.claude/habits"
+  for i in $(seq 1 45); do
+    HOME="$home" bash "$TOOLS" write-learning run "distinct note number $i" "obs$i" >/dev/null
+  done
+  HOME="$home" bash "$TOOLS" prune-learnings >/dev/null
+  [ "$(jq '.learnings | length' "$home/.claude/habits/settings.local.json")" -eq 40 ]
+}
+
+@test "self-heal rebuilds the index from the habit .md files on disk" {
+  local home="$BATS_TEST_TMPDIR/sh"
+  local dir="$home/.claude/habits"
+  mkdir -p "$dir"
+  cat > "$dir/one.md" << 'MD'
+---
+id: one
+tags: [x]
+description: First habit.
+scope: global
+archived: false
+---
+
+## Instruction
+A.
+MD
+  cat > "$dir/two.md" << 'MD'
+---
+id: two
+tags: [y]
+description: Second habit.
+scope: global
+archived: true
+---
+
+## Instruction
+B.
+MD
+  printf '%s' '{"index":[],"meta":{},"log":[],"sessions":{},"observations":[]}' > "$dir/settings.local.json"
+
+  run bash -c "HOME='$home' bash '$TOOLS' self-heal global"
+  assert_contains "rebuilt index with 2 entries" "$output"
+  [ "$(jq '.index | length' "$dir/settings.local.json")" -eq 2 ]
+  [ "$(jq -r '.index[] | select(.id=="two") | .archived' "$dir/settings.local.json")" = "true" ]
+}
+
 @test "env-context detects a habit checkout vs an installed copy" {
   local src="$BATS_TEST_TMPDIR/ec-src"
   mkdir -p "$src"
