@@ -87,15 +87,18 @@ Using the preloaded transcript and pending sessions only.
 1. If both empty, return "Nothing to extract yet." and stop.
 2. Fetch pending transcripts (same call as Maintain step 2). If zero usable prompts, return "Nothing to extract yet." and stop.
 3. Run Sweep.
-4. If `update_counter >= 20` in either scope (from the preloaded metadata), continue at Maintain step 3.
-5. Run Cleanup.
-6. Summary, same opening-line rule as Maintain.
+4. If `update_counter >= 20` in either scope (from the preloaded metadata), continue at Maintain step 3 (which runs Restructure, then Self-improve, then Cleanup) and stop here.
+5. Run Self-improve.
+6. Run Cleanup.
+7. Summary, same opening-line rule as Maintain.
 
 ---
 
 ## Summary Format
 
 Opening line per branch, then: one sentence per new habit; one per merge; categories of skipped prompts or that sweep was skipped; override findings; inventory health; self-improve result or "No observations pending."
+
+On a `source` env-context only, you may append a "Proposed source edits" section that names files and describes changes in plain words. This is the single place file names are allowed; everywhere else the no-file-names rule stands.
 
 ## Sweep
 
@@ -116,15 +119,24 @@ Opening line per branch, then: one sentence per new habit; one per merge; catego
 - Rebuild: `bash "$HABIT_BIN" self-heal global` and `... self-heal project`.
 - Reset meta: `bash "$HABIT_BIN" reset-meta global` and `... reset-meta project`.
 - Prune log: `bash "$HABIT_BIN" prune-log global` and `... prune-log project`.
+- Prune learnings: `bash "$HABIT_BIN" prune-learnings`.
 
 ## Self-improve
 
-Run `bash "$HABIT_BIN" read-observations`. If none, skip. For each observation, identify the responsible plugin source file, read it, apply the smallest fix, preserve style. If none maps clearly, skip and note it.
+1. Run `bash "$HABIT_BIN" read-observations`. If the output is exactly `No observations.`, skip this entire section and do NOT clear observations.
+2. For each actionable observation, write one learning as a direct imperative the target skill can follow at runtime (an instruction it could paste into its own steps), against the responsible target (`run`, `suggest`, `distill`, `edit`, `habit`, or `global`). Prefer the most specific target; use `global` only for guidance that genuinely applies to every skill. Skip observations that do not translate into a concrete runtime behavior, and note them in the summary.
+   ```bash
+   bash "$HABIT_BIN" write-learning <target> '<imperative one-line rule the skill can act on>' '<the observation that produced it>'
+   ```
+3. Run `bash "$HABIT_BIN" env-context`. If it prints `installed`, do not read or edit any plugin files; the learnings above are the only improvement. If it prints `source`, you are in a Habit working tree and may, in addition to the learnings, append a short "Proposed source edits" section to your summary (see Summary Format) for the author to apply by hand. Do not call Read, Write, or Edit on plugin files yourself, and do not paste file contents.
+4. After the learnings are written, clear the consumed observations:
+   ```bash
+   bash "$HABIT_BIN" clear-observations
+   ```
 
 ## Cleanup
 
 ```bash
 bash "$HABIT_BIN" clear-pending-distill
-bash "$HABIT_BIN" clear-observations
 bash "$HABIT_BIN" reset-prompt-count "$HABIT_SID"
 ```
