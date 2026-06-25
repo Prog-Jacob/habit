@@ -23,23 +23,33 @@
 
 ## Install
 
-Requires [Claude Code](https://code.claude.com/docs/en/overview) and [jq](https://jqlang.github.io/jq/).
+Requires [jq](https://jqlang.github.io/jq/), and either [Claude Code](https://code.claude.com/docs/en/overview) or [Cursor](https://cursor.com) 2.5+.
+
+**Claude Code:**
 
 ```
 /plugin marketplace add https://github.com/Prog-Jacob/habit.git
-```
-
-Then:
-
-```
 /plugin install habit@habit
 ```
+
+**Cursor (2.5+):** install `habit` from the Cursor plugin marketplace.
+
+**Manual (any version of either tool):**
+
+```
+git clone https://github.com/Prog-Jacob/habit.git
+cd habit && ./install.sh
+```
+
+For Cursor, merge `hooks/hooks.cursor.json` into `~/.cursor/hooks.json`.
 
 ---
 
 ## Usage
 
 Habit observes every session through hooks. Use Claude Code normally. After enough prompts, skills suggest running `/habit:distill` to extract reusable patterns.
+
+The `/habit:*` forms below are Claude Code syntax. On Cursor the same skills are invoked by name or in plain language (for example, ask to run `fix-types` in the auth module, or say "distill this session").
 
 **Create a habit from a description:**
 
