@@ -118,7 +118,6 @@ On a `source` env-context only, you may append a "Proposed source edits" section
 - Quality check descriptions, tags, instructions.
 - Rebuild: `bash "$HABIT_BIN" self-heal global` and `... self-heal project`.
 - Reset meta: `bash "$HABIT_BIN" reset-meta global` and `... reset-meta project`.
-- Prune log: `bash "$HABIT_BIN" prune-log global` and `... prune-log project`.
 - Prune learnings: `bash "$HABIT_BIN" prune-learnings`.
 
 ## Self-improve
@@ -138,5 +137,7 @@ On a `source` env-context only, you may append a "Proposed source edits" section
 
 ```bash
 bash "$HABIT_BIN" clear-pending-distill
+bash "$HABIT_BIN" prune-log global
+bash "$HABIT_BIN" prune-log project
 bash "$HABIT_BIN" reset-prompt-count "$HABIT_SID"
 ```
