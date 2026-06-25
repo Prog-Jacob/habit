@@ -15,26 +15,52 @@ cmd_read_log() {
 }
 
 # Extract clean user messages from a JSONL transcript file.
+# Auto-detects Claude Code format (type=="user") vs Cursor format (role=="user").
+# Cursor wraps prompts in <timestamp>/<user_query> tags, which are stripped.
 # Filters system noise, trims whitespace, caps at 100 messages.
 _extract_user_messages() {
-  jq -rs '
-    [.[] | select(.type=="user") |
-      {
-        ts: (.timestamp // "" | if . != "" then (split("T")[1] // "" | split(".")[0] // "" | .[0:5]) else "??:??" end),
-        text: (.message.content |
-          if type == "string" then .
-          elif type == "array" then [.[] | select(.type=="text") | .text] | join("\n")
-          else "" end)
-      }
-      | .text |= gsub("^\\s+|\\s+$"; "")
-      | select(.text | length > 0)
-      | select(.text | test("^(<local-command|<command-|Base directory for this skill:|\\[Request interrupted)") | not)
-    ] | .[-100:] | to_entries | map(
-      "[" + ((.key + 1) | tostring) + " | " + .value.ts
-      + (if (.value.text | test("habit|distill|plugin|/habit"; "i")) then " | plugin" else "" end)
-      + "]\n" + .value.text
-    ) | join("\n\n")
-  ' "$1" 2>/dev/null
+  local file="$1"
+  local content
+  content=$(cat "$file" 2>/dev/null) || { return 1; }
+  local first_line
+  first_line=$(echo "$content" | grep -m1 '^{')
+  if echo "$first_line" | jq -e '.role != null' >/dev/null 2>&1; then
+    echo "$content" | jq -rs '
+      [.[] | select(.role=="user") |
+        {
+          ts: (.timestamp // "" | if . != "" then (split("T")[1] // "" | split(".")[0] // "" | .[0:5]) else "??:??" end),
+          text: (.message.content // [] | [.[] | select(.type=="text") | .text] | join("\n"))
+        }
+        | .text |= (gsub("<timestamp>[^<]*</timestamp>"; "") | gsub("</?user_query>"; ""))
+        | .text |= gsub("^\\s+|\\s+$"; "")
+        | select(.text | length > 0)
+        | select(.text | test("^(<local-command|<command-|Base directory for this skill:|\\[Request interrupted)") | not)
+      ] | .[-100:] | to_entries | map(
+        "[" + ((.key + 1) | tostring) + " | " + .value.ts
+        + (if (.value.text | test("habit|distill|plugin|/habit"; "i")) then " | plugin" else "" end)
+        + "]\n" + .value.text
+      ) | join("\n\n")
+    ' 2>/dev/null
+  else
+    echo "$content" | jq -rs '
+      [.[] | select(.type=="user") |
+        {
+          ts: (.timestamp // "" | if . != "" then (split("T")[1] // "" | split(".")[0] // "" | .[0:5]) else "??:??" end),
+          text: (.message.content |
+            if type == "string" then .
+            elif type == "array" then [.[] | select(.type=="text") | .text] | join("\n")
+            else "" end)
+        }
+        | .text |= gsub("^\\s+|\\s+$"; "")
+        | select(.text | length > 0)
+        | select(.text | test("^(<local-command|<command-|Base directory for this skill:|\\[Request interrupted)") | not)
+      ] | .[-100:] | to_entries | map(
+        "[" + ((.key + 1) | tostring) + " | " + .value.ts
+        + (if (.value.text | test("habit|distill|plugin|/habit"; "i")) then " | plugin" else "" end)
+        + "]\n" + .value.text
+      ) | join("\n\n")
+    ' 2>/dev/null
+  fi
 }
 
 _resolve_transcript_path() {
@@ -78,34 +104,46 @@ cmd_read_sessions() {
   for jsonl_file in "$project_dir"/*.jsonl; do
     [ -f "$jsonl_file" ] || continue
     [ "$found" -gt 0 ] && echo "---SESSION---"
-    _extract_user_messages "$jsonl_file"
+    _extract_user_messages "$jsonl_file" || true
     found=$((found + 1))
   done
 
-  [ "$found" -eq 0 ] && echo "No project sessions found."
+  if [ "$found" -eq 0 ]; then echo "No project sessions found."; fi
 }
 
 cmd_list_new_sessions() {
-  local encoded_dir
-  encoded_dir=$(echo "$PWD" | tr '/' '-')
-  local project_dir="$HOME/.claude/projects/$encoded_dir"
-
-  [ -d "$project_dir" ] || { echo "No project sessions found."; exit 0; }
-
-  local watermarks
-  watermarks=$(read_state "$GLOBAL_DIR" | jq -r '.meta.distilled_project_sessions // {}')
+  local state
+  state=$(read_state "$GLOBAL_DIR")
+  local watermarks pending
+  watermarks=$(echo "$state" | jq -r '.meta.distilled_project_sessions // {}')
+  pending=$(echo "$state" | jq -r '[.meta.pending_sessions[]?.transcript_path] | join(" ")')
 
   local new_count=0
-  for jsonl_file in "$project_dir"/*.jsonl; do
-    [ -f "$jsonl_file" ] || continue
-    local file_mtime stored_mtime
-    file_mtime=$(_file_mtime "$jsonl_file")
-    stored_mtime=$(echo "$watermarks" | jq -r --arg f "$jsonl_file" '.[$f] // ""')
-    if [ "$stored_mtime" != "$file_mtime" ]; then
-      echo "$jsonl_file"
-      new_count=$((new_count + 1))
-    fi
-  done
+  _emit_if_new() { # <path>
+    local f="$1" mtime stored
+    [ -f "$f" ] || return 0
+    mtime=$(_file_mtime "$f")
+    stored=$(echo "$watermarks" | jq -r --arg f "$f" '.[$f] // ""')
+    [ "$stored" = "$mtime" ] && return 0
+    case " $pending " in *" $f "*) return 0;; esac
+    echo "$f"
+    new_count=$((new_count + 1))
+  }
+
+  # Claude Code project sessions
+  local encoded_dir project_dir
+  encoded_dir=$(echo "$PWD" | tr '/' '-')
+  project_dir="$HOME/.claude/projects/$encoded_dir"
+  if [ -d "$project_dir" ]; then
+    for jsonl_file in "$project_dir"/*.jsonl; do
+      _emit_if_new "$jsonl_file"
+    done
+  fi
+
+  # Cursor agent transcripts for this workspace (canonical paths, no /..)
+  while IFS= read -r f; do
+    _emit_if_new "$f"
+  done < <(cursor_transcript_files "$PWD")
 
   if [ "$new_count" -eq 0 ]; then echo "No new project sessions."; fi
 }
