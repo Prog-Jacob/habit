@@ -55,6 +55,11 @@ cursor_transcript_files() {
   find "$dir" -maxdepth 2 -name "*.jsonl" -not -path "*/subagents/*" 2>/dev/null
 }
 
+# Claude Code stores project sessions under a slugified workspace path.
+# Single source of that scheme, mirroring cursor_transcript_files.
+# Usage: claude_project_dir [workspace_path]
+claude_project_dir() { echo "$HOME/.claude/projects/$(echo "${1:-$PWD}" | tr '/' '-')"; }
+
 # Most recent Cursor agent transcript for a workspace, or empty.
 # Usage: cursor_transcript_path [workspace_path]
 cursor_transcript_path() {

@@ -15,52 +15,34 @@ cmd_read_log() {
 }
 
 # Extract clean user messages from a JSONL transcript file.
-# Auto-detects Claude Code format (type=="user") vs Cursor format (role=="user").
-# Cursor wraps prompts in <timestamp>/<user_query> tags, which are stripped.
+# Handles Claude Code (type=="user", string or array content) and Cursor
+# (role=="user", array content wrapped in <timestamp>/<user_query> tags). One
+# selector covers both: the role/type union, the string-or-array content union,
+# and the wrapper strip, which is a no-op on Claude transcripts (no such tags).
 # Filters system noise, trims whitespace, caps at 100 messages.
 _extract_user_messages() {
   local file="$1"
   local content
-  content=$(cat "$file" 2>/dev/null) || { return 1; }
-  local first_line
-  first_line=$(echo "$content" | grep -m1 '^{')
-  if echo "$first_line" | jq -e '.role != null' >/dev/null 2>&1; then
-    echo "$content" | jq -rs '
-      [.[] | select(.role=="user") |
-        {
-          ts: (.timestamp // "" | if . != "" then (split("T")[1] // "" | split(".")[0] // "" | .[0:5]) else "??:??" end),
-          text: (.message.content // [] | [.[] | select(.type=="text") | .text] | join("\n"))
-        }
-        | .text |= (gsub("<timestamp>[^<]*</timestamp>"; "") | gsub("</?user_query>"; ""))
-        | .text |= gsub("^\\s+|\\s+$"; "")
-        | select(.text | length > 0)
-        | select(.text | test("^(<local-command|<command-|Base directory for this skill:|\\[Request interrupted)") | not)
-      ] | .[-100:] | to_entries | map(
-        "[" + ((.key + 1) | tostring) + " | " + .value.ts
-        + (if (.value.text | test("habit|distill|plugin|/habit"; "i")) then " | plugin" else "" end)
-        + "]\n" + .value.text
-      ) | join("\n\n")
-    ' 2>/dev/null
-  else
-    echo "$content" | jq -rs '
-      [.[] | select(.type=="user") |
-        {
-          ts: (.timestamp // "" | if . != "" then (split("T")[1] // "" | split(".")[0] // "" | .[0:5]) else "??:??" end),
-          text: (.message.content |
-            if type == "string" then .
-            elif type == "array" then [.[] | select(.type=="text") | .text] | join("\n")
-            else "" end)
-        }
-        | .text |= gsub("^\\s+|\\s+$"; "")
-        | select(.text | length > 0)
-        | select(.text | test("^(<local-command|<command-|Base directory for this skill:|\\[Request interrupted)") | not)
-      ] | .[-100:] | to_entries | map(
-        "[" + ((.key + 1) | tostring) + " | " + .value.ts
-        + (if (.value.text | test("habit|distill|plugin|/habit"; "i")) then " | plugin" else "" end)
-        + "]\n" + .value.text
-      ) | join("\n\n")
-    ' 2>/dev/null
-  fi
+  content=$(cat "$file" 2>/dev/null) || return 1
+  echo "$content" | jq -rs '
+    [.[] | select((.role // .type) == "user") |
+      {
+        ts: (.timestamp // "" | if . != "" then (split("T")[1] // "" | split(".")[0] // "" | .[0:5]) else "??:??" end),
+        text: (.message.content // [] |
+          if type == "string" then .
+          elif type == "array" then [.[] | select(.type=="text") | .text] | join("\n")
+          else "" end)
+      }
+      | .text |= (gsub("<timestamp>[^<]*</timestamp>"; "") | gsub("</?user_query>"; ""))
+      | .text |= gsub("^\\s+|\\s+$"; "")
+      | select(.text | length > 0)
+      | select(.text | test("^(<local-command|<command-|Base directory for this skill:|\\[Request interrupted)") | not)
+    ] | .[-100:] | to_entries | map(
+      "[" + ((.key + 1) | tostring) + " | " + .value.ts
+      + (if (.value.text | test("habit|distill|plugin|/habit"; "i")) then " | plugin" else "" end)
+      + "]\n" + .value.text
+    ) | join("\n\n")
+  ' 2>/dev/null
 }
 
 _resolve_transcript_path() {
@@ -94,9 +76,8 @@ cmd_read_pending_distill() {
 }
 
 cmd_read_sessions() {
-  local encoded_dir
-  encoded_dir=$(echo "$PWD" | tr '/' '-')
-  local project_dir="$HOME/.claude/projects/$encoded_dir"
+  local project_dir
+  project_dir=$(claude_project_dir)
 
   [ -d "$project_dir" ] || { echo "No project sessions found."; exit 0; }
 
@@ -131,9 +112,8 @@ cmd_list_new_sessions() {
   }
 
   # Claude Code project sessions
-  local encoded_dir project_dir
-  encoded_dir=$(echo "$PWD" | tr '/' '-')
-  project_dir="$HOME/.claude/projects/$encoded_dir"
+  local project_dir
+  project_dir=$(claude_project_dir)
   if [ -d "$project_dir" ]; then
     for jsonl_file in "$project_dir"/*.jsonl; do
       _emit_if_new "$jsonl_file"
