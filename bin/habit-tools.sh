@@ -22,6 +22,19 @@ case "$cmd" in
     source "$SCRIPT_DIR/lib/query.sh" ;;
   log-observation|read-observations|clear-observations)
     source "$SCRIPT_DIR/lib/observation.sh" ;;
+  write-learning|read-learnings|prune-learnings)
+    source "$SCRIPT_DIR/lib/learnings.sh" ;;
+  env-context)
+    cmd_env_context() {
+      local root="${1:-$SCRIPT_DIR/..}"
+      if git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+         && git -C "$root" remote get-url origin 2>/dev/null | grep -qiE '[/:]habit(\.git)?/?$'; then
+        echo "source"
+      else
+        echo "installed"
+      fi
+    }
+    ;;
   read-shared)
     cmd_read_shared() { cat "$SCRIPT_DIR/../skills/habit-shared/${1:?filename required}"; }
     ;;
@@ -50,7 +63,7 @@ case "$cmd" in
     source "$SCRIPT_DIR/lib/maintenance.sh" ;;
   *)
     echo "Usage: habit-tools.sh <command> [args]" >&2
-    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-sessions, list-new-sessions, read-prompt-count, read-pending-distill, read-log, read-shared, distill-preload, session-init, session-end, prompt-tick, watch, reset-prompt-count, clear-pending-distill, mark-sessions-distilled, check-triggers, write-habit, log-exec, self-heal, reset-meta, prune-log, log-observation, read-observations, clear-observations" >&2
+    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-sessions, list-new-sessions, read-prompt-count, read-pending-distill, read-log, read-shared, env-context, distill-preload, session-init, session-end, prompt-tick, watch, reset-prompt-count, clear-pending-distill, mark-sessions-distilled, check-triggers, write-habit, log-exec, self-heal, reset-meta, prune-log, log-observation, read-observations, clear-observations, write-learning, read-learnings, prune-learnings" >&2
     exit 1
     ;;
 esac
