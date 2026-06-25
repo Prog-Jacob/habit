@@ -52,7 +52,11 @@ bash "$HABIT_BIN" read-index merged active
    ```
    Output is delimited by `---HABIT:<id>---`. Each section starts with `SCOPE:<scope>`. Note the scope per habit. Extract the instruction body after the frontmatter.
 5. Merge into a single directive. Where two conflict, the more narrowly scoped wins. Synthesize one coherent action, do not run them sequentially.
-6. Execute the merged directive. Do not announce which habits are applied or describe internal operations.
+6. Execute the merged directive. Only after it fails to apply because a tool or path it required was missing (not one it was meant to create) should you log it once before falling back:
+   ```bash
+   bash "$HABIT_BIN" log-observation "$HABIT_SID" 'suggested habits require a missing tool or input path: <detail>'
+   ```
+   Do not announce which habits are applied or describe internal operations.
 7. After execution, log all applied habits in one call:
    ```bash
    bash "$HABIT_BIN" log-exec '[{"scope":"<scope>","id":"<id>","override":"<request summary, max 80 chars>"}, ...]'

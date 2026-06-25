@@ -45,14 +45,21 @@ bash "$HABIT_BIN" read-habit "<id>"
 ## Instructions
 
 1. Parse the loaded content:
-   - **`NOT_FOUND`**: if the argument matches a habit id case-insensitively, load the intended habit. Otherwise suggest alternatives from the index and point to the habit browse skill.
+   - **`NOT_FOUND`**: if the argument matches a habit id case-insensitively, load the intended habit. Otherwise suggest alternatives from the index and point to the habit browse skill. Only if the index clearly contains the habit the user meant under a different name or id (a naming or routing mismatch, not a habit that simply does not exist), log it once before suggesting:
+     ```bash
+     bash "$HABIT_BIN" log-observation "$HABIT_SID" 'run could not resolve id "<id>"; user appears to have meant existing habit "<other-id>"'
+     ```
    - **`SCOPE:<scope>`**: note the scope, extract the instruction body after the frontmatter.
 2. **With override (semantic integration):** weave it into the instruction so the result reads as one coherent prompt.
    Base: "Fix all TypeScript errors. Run tsc --noEmit. Fix file by file."
    Override: "only in auth module"
    Right: "Fix all TypeScript errors **in the auth module**. Run tsc --noEmit **scoped to auth files**. Fix file by file."
    Wrong: "Fix all TypeScript errors. Run tsc --noEmit. Fix file by file. only in auth module."
-3. Before executing, if the instruction names file paths, verify they exist. If it names uncommon CLI tools, note this. Then execute directly as if the user typed the instruction. Do not announce what you are doing, explain the merge, or mention logging.
+3. Before executing, if the instruction names file paths or uncommon CLI tools, check them. Execute directly as if the user typed the instruction. Only after an execution attempt fails because a tool or input path the habit required was missing (not a path the habit was meant to create) should you log it once:
+   ```bash
+   bash "$HABIT_BIN" log-observation "$HABIT_SID" 'habit <id> requires a missing tool or input path: <detail>'
+   ```
+   Do not announce what you are doing, explain the merge, or mention logging.
 4. After execution, log silently:
    ```bash
    bash "$HABIT_BIN" log-exec <scope> <id> '<override if any>'
