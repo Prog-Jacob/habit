@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 # Habit Distill: Sweep & Restructure
 
-Runs in a forked subagent. Use only the commands in the Operations reference for writes. Summaries must be human-friendly. Do not mention file names, counters, timestamps, or pruning stats.
+Runs in an isolated fork. Use only the commands in the Operations reference for writes. Summaries must be human-friendly. Do not mention file names, counters, timestamps, or pruning stats.
 
 ## Setup
 

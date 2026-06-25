@@ -32,7 +32,7 @@ Requires [jq](https://jqlang.github.io/jq/), and either [Claude Code](https://co
 /plugin install habit@habit
 ```
 
-**Cursor (2.5+):** install `habit` from the Cursor plugin marketplace.
+**Cursor (2.5+):** use the manual install below.
 
 **Manual (any version of either tool):**
 
@@ -134,7 +134,7 @@ Prefer narrowing types over adding `as` casts.
 ## Uninstall
 
 ```
-/plugin uninstall habit@prog-jacob-habit
+/plugin uninstall habit@habit
 ```
 
 Habit data in `~/.claude/habits/` is preserved. To delete it:

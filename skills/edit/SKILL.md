@@ -56,7 +56,7 @@ Output: the confirmation message or the question to the user.
 | No      | Yes    | Create new habit from description           |
 | No      | No     | Ask what this habit should do and stop      |
 
-2. If the action is "ask", ask and stop. Otherwise apply the Processing Rules above. Edit in the scope where it was found. To change scope, the user must explicitly request it.
+2. If the action is "ask", ask and stop. Otherwise apply the loaded Processing Rules. Edit in the scope where it was found. To change scope, the user must explicitly request it.
 3. Write:
    ```bash
    bash "$HABIT_BIN" write-habit <scope> <id> '<frontmatter+body>'
