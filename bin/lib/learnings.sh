@@ -21,8 +21,7 @@ cmd_read_learnings() {
 
 cmd_prune_learnings() {
   # De-dup by (target,note) keeping the first occurrence, then keep the last
-  # LEARN_RETAIN. reduce preserves the array's insertion order while deduping;
-  # group_by or unique_by would reorder the list, so do not swap them in.
+  # LEARN_RETAIN. reduce preserves insertion order; group_by/unique_by would not.
   update_state "$GLOBAL_DIR" jq --argjson retain "$LEARN_RETAIN" '
     .learnings = ((.learnings // [])
       | reduce .[] as $l ([];

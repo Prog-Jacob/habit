@@ -45,9 +45,9 @@ else
   _file_mtime() { stat -c "%Y" "$1"; }
 fi
 
-# List every Cursor agent transcript for a workspace, newest-agnostic.
-# Cursor stores transcripts at agent-transcripts/<uuid>/<uuid>.jsonl (nested);
-# subagent transcripts are excluded. Single source of the path scheme and find.
+# List every Cursor agent transcript for a workspace.
+# Cursor stores them at agent-transcripts/<uuid>/<uuid>.jsonl; subagent
+# transcripts are excluded. Single source of the path scheme and find.
 # Usage: cursor_transcript_files [workspace_path]
 cursor_transcript_files() {
   local workspace="${1:-$PWD}"

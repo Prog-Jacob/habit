@@ -165,10 +165,8 @@ cmd_check_triggers() {
   local pending
   pending=$(echo "$state" | jq -r '(.meta.pending_sessions // []) | length')
 
-  # T2: the trigger means exactly "there is unprocessed input." It fires when the
-  # current session crossed the prompt threshold, prior sessions are pending, or
-  # new project sessions await a sweep. Write counter and raw log length are not
-  # nags (the log is bounded every distill; see distill Cleanup).
+  # Fire when there is unprocessed input: the current session crossed the
+  # prompt threshold, prior sessions are pending, or new project sessions exist.
   local has_new=0
   [ "$(cmd_list_new_sessions)" = "No new project sessions." ] || has_new=1
 
