@@ -1,0 +1,11 @@
+{
+  "name": "habit",
+  "displayName": "Habit",
+  "version": "1.10.0",
+  "description": "Intelligent prompt inventory. Observes, captures, and evolves reusable prompts into a living collection.",
+  "author": { "name": "prog-jacob" },
+  "repository": "https://github.com/Prog-Jacob/habit",
+  "keywords": ["habits", "prompts", "workflows", "productivity", "automation"],
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.cursor.json"
+}
