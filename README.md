@@ -103,7 +103,9 @@ Pick by number or name. Add context to narrow a run (e.g., `1 only in auth`).
 
 **Hooks** fire on every session. `SessionStart` registers the session. `UserPromptSubmit` increments a prompt counter (skips prompts under 5 words) and records the transcript path. `SessionEnd` saves a breadcrumb for later distill if any prompts were captured.
 
-**Distill** runs in a forked subagent. It preloads the current transcript, the merged habit index, pending sessions, execution log, and metadata. It classifies each prompt as reusable or one-off, deduplicates against existing habits, and writes new or merged entries. `maintain` adds a restructure pass and processes plugin observations for self-improvement. `project` scans all `.jsonl` session files for the current working directory.
+**Distill** runs in a forked subagent. It preloads the current transcript, the merged habit index, pending sessions, execution log, and metadata. It classifies each prompt as reusable or one-off, deduplicates against existing habits, and writes new or merged entries. Every sweep also runs self-improvement (below). `maintain` adds a full restructure pass: merging convergent habits, normalizing tags, and archiving stale entries. `project` scans all `.jsonl` session files for the current working directory.
+
+**Self-improvement.** When a skill hits friction (a misroute, or a missing tool or path), it records an observation. Distill turns each actionable observation into a _learning_: a short standing note aimed at the skill it concerns, stored in `settings.local.json` next to your habits. Each skill reads its learnings on the next run and applies them as extra guidance. Because the overlay lives in your data directory rather than the plugin files, it survives updates and behaves identically on Claude Code and Cursor.
 
 **Scope.** Habits live in `~/.claude/habits/` (global) or `.claude/habits/` (project). Project habits shadow global ones with the same id.
 
