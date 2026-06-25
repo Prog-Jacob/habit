@@ -13,6 +13,7 @@ cmd_session_init() {
      | .sessions[$sid].prompt_count = (.sessions[$sid].prompt_count // 0)
      | .sessions[$sid].transcript_path = (.sessions[$sid].transcript_path // "")
      | .sessions = (.sessions | to_entries | map(select(.key == $sid or (.value.init_time // "") >= $cutoff)) | from_entries)'
+  write_breadcrumb "$session_id"
   echo "OK session initialized"
 }
 
@@ -39,6 +40,7 @@ cmd_session_end() {
     update_state "$GLOBAL_DIR" jq --arg sid "$session_id" 'del(.sessions[$sid])'
   fi
 
+  clear_breadcrumb
   echo "OK session ended"
 }
 
