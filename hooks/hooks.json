@@ -1,12 +1,12 @@
 {
-  "description": "Habit session lifecycle hooks. Auto-watch on every session, breadcrumb on end.",
+  "description": "Habit session lifecycle hooks. Writes a session breadcrumb on start, clears it on end, counts prompts in between.",
   "hooks": {
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh prompt-tick session_id transcript_path prompt",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh prompt-tick",
             "async": true
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh session-init session_id",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh session-init",
             "async": true
           }
         ]
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh session-end session_id",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh session-end",
             "async": true
           }
         ]

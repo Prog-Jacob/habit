@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [{ "command": "./hooks/habit-hook.sh session-init" }],
+    "beforeSubmitPrompt": [{ "command": "./hooks/habit-hook.sh prompt-tick" }],
+    "sessionEnd": [{ "command": "./hooks/habit-hook.sh session-end" }]
+  }
+}

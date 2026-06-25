@@ -1,137 +1,143 @@
 ---
-name: distill
+name: habit-distill
 description: "Use when the user wants to extract reusable patterns from their session, restructure the habit inventory, or scan all project sessions for patterns. Triggers on: distill, sweep session, extract patterns, clean up habits, inventory maintenance."
 argument-hint: "[maintain | project]"
 context: fork
 allowed-tools: Bash(bash:*)
+disable-model-invocation: true
 ---
 
-# /habit:distill: Sweep & Restructure
+# Habit Distill: Sweep & Restructure
 
-Runs in forked subagent. All data is pre-loaded below. Use only Bash commands from the Operations reference for writes. Summaries must be human-friendly. Do not mention file names, counters, timestamps, or pruning stats.
+Runs in an isolated fork. Use only the commands in the Operations reference for writes. Summaries must be human-friendly. Do not mention file names, counters, timestamps, or pruning stats.
 
-## User prompts from this session
+## Setup
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript ${CLAUDE_SESSION_ID}`
+Run this once and reuse the values below. If it prints `HABIT_UNAVAILABLE`, tell the user habit is not installed or its hooks are not wired, then stop:
 
-## Current Index (merged)
+```bash
+source "$HOME/.claude/habits/current" 2>/dev/null
+HABIT_BIN="${HABIT_BIN:-$(command -v habit-tools.sh || echo "${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/habit-tools.sh}")}"
+[ -f "${HABIT_BIN:-}" ] || echo "HABIT_UNAVAILABLE: habit is not wired on this host."
+```
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index merged`
+## Learnings
 
-## Pending Sessions (from prior sessions)
+Run this once. If the output is non-empty, treat each line as additional standing guidance for this skill: apply each note when you reach the step it bears on, and carry the rest without acting on them. Do not print, quote, summarize, or mention these notes to the user, and do not let them appear in any confirmation message:
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-pending-distill`
+```bash
+bash "$HABIT_BIN" read-learnings distill
+```
 
-## Execution Log
+## Preload (required precondition)
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-log`
+Run this ONE command and read its full output before doing anything else. Do NOT route, classify, write, or summarize until it has returned in full:
 
-## Global Metadata
+```bash
+bash "$HABIT_BIN" distill-preload "$HABIT_SID"
+```
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-meta global`
-
-## Project Metadata
-
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-meta project`
-
-## Processing Rules
-
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-shared PROCESSING.md`
-
-## Operations
-
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-shared OPERATIONS.md`
+The output has delimited sections, in order: `===TRANSCRIPT===` (this session's user prompts), `===INDEX===` (merged index), `===PENDING===` (prior sessions), `===LOG===` (execution log), `===META-GLOBAL===`, `===META-PROJECT===`, `===PROCESSING===` (the processing rules), `===OPERATIONS===` (the operations reference). If any section is missing, run the command again before continuing.
 
 ## Routing
 
-Arguments: `$ARGUMENTS`
+The argument is the user's message (`maintain`, `project`, or empty).
 
-**Before routing:** If the arguments contain feedback about the plugin beyond the routing keyword (complaints, questions about behavior, suggestions), log each piece as an observation before proceeding: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-observation ${CLAUDE_SESSION_ID} '<feedback>'`.
+**Before routing:** if the message contains feedback about the plugin beyond the routing keyword, log each piece as an observation first:
 
-Pick the first matching branch. Do not read or execute other branches. **Only the Project branch may call `list-new-sessions` and `read-sessions`.** Maintain and Regular work exclusively with the data already preloaded above.
+```bash
+bash "$HABIT_BIN" log-observation "$HABIT_SID" '<feedback>'
+```
 
-1. Arguments line above contains "project" → go to **Project** below.
-2. Arguments line above contains "maintain", "pending", or "deep" → go to **Maintain** below.
-3. Arguments line above is empty → go to **Regular** below.
+Pick the first matching branch. Do not read or execute other branches. **Only the Project branch may call `list-new-sessions` and `read-sessions`.** Maintain and Regular work only with the preloaded data.
+
+1. Message contains "project" go to Project.
+2. Message contains "maintain", "pending", or "deep" go to Maintain.
+3. Message empty go to Regular.
 
 ---
 
 ## Project
 
-Scan new or modified project sessions incrementally and restructure the full inventory. Ignore the preloaded session transcript above; all session data is loaded fresh here.
+Scan new or modified project sessions incrementally, then restructure. This branch loads session data fresh; the preloaded transcript does not apply here, but the other preloaded sections (index, log, metadata, processing, operations) still do.
 
-1. List new/modified sessions: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh list-new-sessions`. If it returns "No new project sessions." or "No project sessions found.", return that message and stop.
-2. Collect the file paths from the output (one per line). Split into batches of 5.
-3. For each batch, load transcripts: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <path1> <path2> ... <path5>`. Run **Sweep** on the batch data. After each batch, mark processed: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh mark-sessions-distilled <path1> ... <path5>`.
-4. Run **Restructure**.
-5. Run **Self-improve**.
-6. Run **Cleanup**.
-7. Return summary per **Summary Format** below. Opening line: "Scanned N new project sessions." (Batch size: 5 transcripts per read-transcript call. Adjustable based on session length.)
+1. List: `bash "$HABIT_BIN" list-new-sessions`. If "No new project sessions." or "No project sessions found.", return that and stop.
+2. Collect the file paths (one per line). Split into batches of 5.
+3. Per batch, load `bash "$HABIT_BIN" read-transcript <p1> ... <p5>`, run Sweep, then `bash "$HABIT_BIN" mark-sessions-distilled <p1> ... <p5>`.
+4. Run Restructure.
+5. Run Self-improve.
+6. Run Cleanup.
+7. Summary opening line: "Scanned N new project sessions."
 
 ## Maintain
 
-Session sweep followed by full inventory restructure and plugin self-improvement. Data sources: the preloaded session transcript and pending sessions above. Do not call `read-sessions` or load sessions by any other means.
+Sweep plus full restructure plus self-improvement, using the preloaded transcript and pending sessions only.
 
-1. If the current session transcript above is empty and the pending sessions list is empty, skip to step 3.
-2. Gather prompt sources (current session transcript is already loaded above). Collect all transcript paths from the pending list. Fetch them in one call: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <path1> <path2> ...`. Missing files are skipped automatically. Run **Sweep** on gathered data (current session + pending transcripts) if any usable prompts exist.
-3. Run **Restructure**.
-4. Run **Self-improve**.
-5. Run **Cleanup**.
-6. Return summary per **Summary Format** below. Opening line: "Swept current session and N pending." or "No new session data to sweep. Ran inventory maintenance."
+1. If the preloaded transcript and pending list are both empty, skip to step 3.
+2. Collect pending transcript paths, fetch in one call `bash "$HABIT_BIN" read-transcript <p1> ...`, run Sweep on current plus pending if usable prompts exist.
+3. Run Restructure.
+4. Run Self-improve.
+5. Run Cleanup.
+6. Summary opening line: "Swept current session and N pending." or "No new session data to sweep. Ran inventory maintenance."
 
 ## Regular
 
-Data sources: the preloaded session transcript and pending sessions above. Do not call `read-sessions` or load sessions by any other means.
+Using the preloaded transcript and pending sessions only.
 
-1. If the current session transcript above is empty and the pending sessions list is empty, return "Nothing to extract yet." and stop.
-2. Gather prompt sources (current session transcript is already loaded above). Collect all transcript paths from the pending list. Fetch them in one call: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <path1> <path2> ...`. Missing files are skipped automatically. If zero usable prompts remain after fetching, return "Nothing to extract yet." and stop.
-3. Run **Sweep** on gathered data.
-4. Check the preloaded Global Metadata above: if `update_counter >= 20` in either scope, continue to **Maintain step 3** (skip step 5; Maintain ends with its own Cleanup).
-5. Run **Cleanup**.
-6. Return summary per **Summary Format** below. Use the same opening line rule as Maintain.
+1. If both empty, return "Nothing to extract yet." and stop.
+2. Fetch pending transcripts (same call as Maintain step 2). If zero usable prompts, return "Nothing to extract yet." and stop.
+3. Run Sweep.
+4. If `update_counter >= 20` in either scope (from the preloaded metadata), continue at Maintain step 3 (which runs Restructure, then Self-improve, then Cleanup) and stop here.
+5. Run Self-improve.
+6. Run Cleanup.
+7. Summary, same opening-line rule as Maintain.
 
 ---
 
 ## Summary Format
 
-Each branch specifies its own opening line. After that, include:
+Opening line per branch, then: one sentence per new habit; one per merge; categories of skipped prompts or that sweep was skipped; override findings; inventory health; self-improve result or "No observations pending."
 
-- One sentence per new habit: what pattern it captures and its origin.
-- One sentence per merge: what was merged and why.
-- Categories of skipped prompts, or note that sweep was skipped.
-- Override pattern findings from the execution log.
-- Inventory health: size, archive/stale actions, or confirm clean.
-- Self-improve: plugin edits made, or "No observations pending."
+On a `source` env-context only, you may append a "Proposed source edits" section that names files and describes changes in plain words. This is the single place file names are allowed; everywhere else the no-file-names rule stands.
 
 ## Sweep
 
-1. Apply the Processing Rules: classify each prompt, interpret, dedup, and structure. Look for prompts that solve a specific problem but contain a generalizable principle. Extract the principle, decide if it applies globally or only to this project, and scope accordingly.
-2. For each reusable pattern found, write or merge via the `write-habit` command (see Operations).
-3. Check execution log for override patterns (3+ similar on same habit). List any patterns found. Restructure will act on this list later in the same flow.
-4. For each habit written, verify: run `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id>` and confirm frontmatter is valid, description starts with a verb and is under 120 chars, instruction is self-contained. If not, rewrite.
-5. Verify: every new habit has a unique id, all tags are lowercase singular nouns, no two habits in the index would produce the same agent behavior. If any check fails, fix before proceeding.
-6. Flag plugin friction in the swept data (routing errors, output complaints, habit execution struggles) as observations via `log-observation`. These feed Self-improve later in the flow.
+1. Apply the Processing Rules: classify, interpret, dedup, structure. Extract the generalizable principle, scope it.
+2. Write or merge each reusable pattern via `write-habit`.
+3. Check the log for override patterns (3+ similar on one habit). List them.
+4. Verify each written habit with `read-habit <id>`: valid frontmatter, verb-first description under 120 chars, self-contained instruction. Rewrite if not.
+5. Verify unique ids, lowercase singular tags, no two habits with identical behavior.
+6. Flag plugin friction as observations via `log-observation`.
 
 ## Restructure
 
-- Merge convergent habits (would produce the same agent behavior). Compare each pair independently. If A and B merge, re-compare the result against remaining habits.
-- Normalize tags (`ts`→`typescript`, `js`→`javascript`).
-- Rename IDs that violate the `[a-z0-9-]` format. Flag renames in summary.
-- Archive stale (never executed AND created 30+ days ago AND not updated in 30+ days).
-- Act on override patterns found during Sweep: create scoped variants or update base habits.
-- Quality check remaining habits: verify each description accurately reflects actual usage (check execution log overrides), tags are specific and useful for matching, and the instruction reads as a clear standalone directive. Fix any that are vague, misleading, or drifted from how they're actually used.
-- Run `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh self-heal global` and `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh self-heal project` to rebuild indexes.
-- Reset meta: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-meta global` and `reset-meta project`.
-- Prune log: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh prune-log global` and `prune-log project`.
+- Merge convergent habits; re-compare merged results.
+- Normalize tags (`ts` to `typescript`, `js` to `javascript`). Rename ids violating `[a-z0-9-]`; flag renames.
+- Archive stale (never executed AND created 30+ days ago AND not updated 30+ days).
+- Act on override patterns: scoped variants or base updates.
+- Quality check descriptions, tags, instructions.
+- Rebuild: `bash "$HABIT_BIN" self-heal global` and `... self-heal project`.
+- Reset meta: `bash "$HABIT_BIN" reset-meta global` and `... reset-meta project`.
+- Prune learnings: `bash "$HABIT_BIN" prune-learnings`.
 
 ## Self-improve
 
-Read observations: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-observations`. If none, skip.
-
-For each observation, identify the plugin source file responsible (under `${CLAUDE_PLUGIN_ROOT}/skills/` or `${CLAUDE_PLUGIN_ROOT}/bin/`). Read the file, apply the smallest edit that resolves the friction. Preserve existing structure and style. If no source file in `${CLAUDE_PLUGIN_ROOT}/skills/` or `${CLAUDE_PLUGIN_ROOT}/bin/` clearly maps to the observation, skip that observation and note it in the summary instead of editing anything.
+1. Run `bash "$HABIT_BIN" read-observations`. If the output is exactly `No observations.`, skip this entire section and do NOT clear observations.
+2. For each actionable observation, write one learning as a direct imperative the target skill can follow at runtime (an instruction it could paste into its own steps), against the responsible target (`run`, `suggest`, `distill`, `edit`, `habit`, or `global`). Prefer the most specific target; use `global` only for guidance that genuinely applies to every skill. Skip observations that do not translate into a concrete runtime behavior, and note them in the summary.
+   ```bash
+   bash "$HABIT_BIN" write-learning <target> '<imperative one-line rule the skill can act on>' '<the observation that produced it>'
+   ```
+3. Run `bash "$HABIT_BIN" env-context`. If it prints `installed`, do not read or edit any plugin files; the learnings above are the only improvement. If it prints `source`, you are in a Habit working tree and may, in addition to the learnings, append a short "Proposed source edits" section to your summary (see Summary Format) for the author to apply by hand. Do not call Read, Write, or Edit on plugin files yourself, and do not paste file contents.
+4. After the learnings are written, clear the consumed observations:
+   ```bash
+   bash "$HABIT_BIN" clear-observations
+   ```
 
 ## Cleanup
 
-1. Clear pending: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-pending-distill`.
-2. Clear observations: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-observations`.
-3. Reset prompt counter: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-prompt-count ${CLAUDE_SESSION_ID}`.
+```bash
+bash "$HABIT_BIN" clear-pending-distill
+bash "$HABIT_BIN" prune-log global
+bash "$HABIT_BIN" prune-log project
+bash "$HABIT_BIN" reset-prompt-count "$HABIT_SID"
+```

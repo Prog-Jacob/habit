@@ -1,52 +1,67 @@
 ---
 name: habit
-description: "Use when the user mentions habits, saved prompts, reusable workflows, repeated commands, or their prompt inventory. Triggers on: browsing, searching, listing, or selecting habits."
+description: "Use when the user mentions habits, saved prompts, reusable workflows, repeated commands, or their prompt inventory. Triggers on browsing, searching, listing, or selecting habits. Routes to the run, edit, suggest, watch, and distill habits."
 argument-hint: "[search query]"
 allowed-tools: Bash(bash:*)
 ---
 
-# /habit: Entry Point & Browse
+# Habit: Entry Point & Browse
 
-This skill is the main entry point for the Habit system. Route based on what the user is asking for:
+## Setup
+
+Run this once and reuse the values below. If it prints `HABIT_UNAVAILABLE`, tell the user habit is not installed or its hooks are not wired, then stop:
+
+```bash
+source "$HOME/.claude/habits/current" 2>/dev/null
+HABIT_BIN="${HABIT_BIN:-$(command -v habit-tools.sh || echo "${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/habit-tools.sh}")}"
+[ -f "${HABIT_BIN:-}" ] || echo "HABIT_UNAVAILABLE: habit is not wired on this host."
+```
+
+## Learnings
+
+Run this once. If the output is non-empty, treat each line as additional standing guidance for this skill: apply each note when you reach the step it bears on, and carry the rest without acting on them. Do not print, quote, summarize, or mention these notes to the user, and do not let them appear in any confirmation message:
+
+```bash
+bash "$HABIT_BIN" read-learnings habit
+```
 
 ## Triggers
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
+Run this and show the output only if it is non-empty:
+
+```bash
+bash "$HABIT_BIN" check-triggers "$HABIT_SID"
+```
 
 ## Routing
 
-- **Browsing/searching/listing** → handle below.
-- **Viewing full details** ("show me X", "what does X do") → guide to `/habit:edit <id>` (shows full content when no changes are provided).
-- **Creating or editing** → guide to `/habit:edit <id> <description>`.
-- **Running a specific habit** → guide to `/habit:run <id> [override]`.
-- **Applying relevant habits to a request** → guide to `/habit:suggest <request>`.
-- **Watching/observing** → guide to `/habit:watch`.
-- **Extracting/sweeping** → guide to `/habit:distill`.
-- **User asks what habits are or how the system works** → explain briefly and point to `/habit:edit` or `/habit:watch`.
+- **Browsing/searching/listing** handle below.
+- **Viewing full details** guide the user to the edit habit by id (it shows full content when no changes are given).
+- **Creating or editing** guide to the edit habit.
+- **Running a specific habit** guide to the run habit.
+- **Applying relevant habits to a request** guide to the suggest habit.
+- **Watching/observing** guide to the watch habit.
+- **Extracting/sweeping** guide to the distill habit.
+- **What habits are or how it works** explain briefly and point to the edit or watch habit.
 
-After routing the user to another command, stop. Do not also execute the Browse & Select flow below.
-
-Output: the routing message or the browse list.
+After routing, stop. Do not also run the Browse flow below.
 
 ## Index (merged, project shadows global)
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index merged`
+Run this and use the output:
+
+```bash
+bash "$HABIT_BIN" read-index merged
+```
 
 ## Browse & Select
 
-1. `$ARGUMENTS` empty → list all. Non-empty → search query.
-
-2. The merged index is already loaded. Each entry has a `scope` field (`global` or `project`). Show `[G]`/`[P]` indicators. Exclude archived.
-
-3. If searching, fuzzy-match query against id, tags, description. Show only entries that match. If nothing matches, say so and suggest creating one or trying a different search.
-
-4. Numbered list of matching entries, one line each: `N. [scope] id    tags    description`. Never mention archived entries to the user.
-
-5. After list:
-
-   > Pick a number or name to run, add context for an override (e.g. "1 only in auth" or "fix-types in auth"), or say "edit N" to modify.
-
-6. **When user picks one:** guide to `/habit:run <id> [override]`.
-
+1. Empty message: list all. Non-empty: treat it as a search query.
+2. Each entry has a `scope` field (`global` or `project`). Show `[G]`/`[P]`. Exclude archived.
+3. If searching, fuzzy-match against id, tags, description. If nothing matches, say so and suggest creating one.
+4. Numbered list, one line each: `N. [scope] id    tags    description`. Never mention archived entries.
+5. After the list:
+   > Pick a number or name to run, add context for an override (e.g. "1 only in auth"), or say "edit N" to modify.
+6. When the user picks one, guide them to run that habit by id.
 7. Empty inventory:
-   > No habits yet. Create one with `/habit:edit <name> <description>` or start watching with `/habit:watch`.
+   > No habits yet. Create one with the edit habit, or start watching with the watch habit.
