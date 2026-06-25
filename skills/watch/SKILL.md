@@ -1,43 +1,50 @@
 ---
-name: watch
+name: habit-watch
 description: "Use when the user wants to check, pause, or resume automatic habit capture. Triggers on: watch status, stop watching, pause capture, resume capture."
 argument-hint: "[off|status]"
 allowed-tools: Bash(bash:*)
+disable-model-invocation: true
 ---
 
-# /habit:watch: Observation Control
+# Habit Watch: Observation Control
 
-Watch is always active by default. This skill lets you pause, resume, or check status. Watch State and Prompt Count below are already resolved.
+Watch is always active by default. This skill lets you check status, pause, or resume.
 
-## Triggers
+## Setup
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
+Run this once and reuse the values below. If it prints `HABIT_UNAVAILABLE`, tell the user habit is not installed or its hooks are not wired, then stop:
 
-## Watch State
+```bash
+source "$HOME/.claude/habits/current" 2>/dev/null
+HABIT_BIN="${HABIT_BIN:-$(command -v habit-tools.sh || echo "${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/habit-tools.sh}")}"
+[ -f "${HABIT_BIN:-}" ] || echo "HABIT_UNAVAILABLE: habit is not wired on this host."
+```
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh watch status ${CLAUDE_SESSION_ID}`
+## Resolve state
 
-## Prompt Count
+Run these and use the outputs (triggers message, then `ACTIVE` or `PAUSED`, then the count):
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-prompt-count ${CLAUDE_SESSION_ID}`
+```bash
+bash "$HABIT_BIN" check-triggers "$HABIT_SID"
+bash "$HABIT_BIN" watch status "$HABIT_SID"
+bash "$HABIT_BIN" read-prompt-count "$HABIT_SID"
+```
 
 ## Routing
 
-Pick the first matching branch:
-
-1. `$ARGUMENTS` is empty, "status", or "resume" → **Status/Resume** below.
-2. `$ARGUMENTS` expresses intent to deactivate (off, stop, disable, pause, turn off) → **Pause** below.
-3. Otherwise → **Status/Resume** below (default).
+1. Message empty, "status", or "resume" go to Status/Resume.
+2. Message intends deactivation (off, stop, disable, pause, turn off) go to Pause.
+3. Otherwise go to Status/Resume.
 
 ## Status/Resume
 
-1. If Watch State is `ACTIVE`: when Prompt Count is `0`, say "Watch is active. No prompts captured yet this session." Otherwise say "Watch is active. {Prompt Count} prompts captured this session." If the Triggers section above is non-empty, include its message. Stop.
-2. Resume: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh watch start ${CLAUDE_SESSION_ID}`
+1. If `ACTIVE`: count 0 says "Watch is active. No prompts captured yet this session.", else "Watch is active. {count} prompts captured this session." Include the triggers message if non-empty. Stop.
+2. Resume: `bash "$HABIT_BIN" watch start "$HABIT_SID"`
 3. Confirm: "Watch resumed."
 
 ## Pause
 
-1. If Watch State is `PAUSED` → "Watch is already paused." and stop.
-2. Pause: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh watch stop ${CLAUDE_SESSION_ID}`
-3. If Prompt Count > 0, suggest: "Run `/habit:distill` to process this session's patterns."
-4. Confirm: "Watch paused. Run `/habit:watch` to resume."
+1. If `PAUSED`: "Watch is already paused." Stop.
+2. Pause: `bash "$HABIT_BIN" watch stop "$HABIT_SID"`
+3. If count > 0, suggest running the distill habit to process this session.
+4. Confirm: "Watch paused. Run the watch habit to resume."

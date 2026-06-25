@@ -1,41 +1,61 @@
 ---
-name: edit
+name: habit-edit
 description: "Use when the user wants to create a new habit or update an existing one through natural language. Triggers on: saving a habit, creating a workflow, editing a prompt, defining a reusable pattern."
 argument-hint: "<id> [changes or description]"
 allowed-tools: Bash(bash:*)
+disable-model-invocation: true
 ---
 
-# /habit:edit: Create or Update
+# Habit Edit: Create or Update
+
+## Setup
+
+Run this once and reuse the values below. If it prints `HABIT_UNAVAILABLE`, tell the user habit is not installed or its hooks are not wired, then stop:
+
+```bash
+source "$HOME/.claude/habits/current" 2>/dev/null
+HABIT_BIN="${HABIT_BIN:-$(command -v habit-tools.sh || echo "${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/habit-tools.sh}")}"
+[ -f "${HABIT_BIN:-}" ] || echo "HABIT_UNAVAILABLE: habit is not wired on this host."
+```
 
 ## Triggers
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
+Run this and show the output only if it is non-empty:
 
-## Existing Habit (if any)
+```bash
+bash "$HABIT_BIN" check-triggers "$HABIT_SID"
+```
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit "$0"`
+## Load existing habit and processing rules
 
-## Processing Rules
+Parse the user's message: first token is the id (lowercase, alphanumeric and hyphens, max 40 chars), the rest is the changes or description. Load both:
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-shared PROCESSING.md`
+```bash
+bash "$HABIT_BIN" read-habit "<id>"
+bash "$HABIT_BIN" read-shared PROCESSING.md
+```
 
 ## Instructions
 
 Output: the confirmation message or the question to the user.
 
-1. Parse `$ARGUMENTS`: first token = id (lowercase, alphanumeric + hyphens, max 40 chars), rest = changes/description.
+1. If the loaded content starts with `SCOPE:<scope>`, the habit exists. If `NOT_FOUND`, it is new.
 
-2. The existing habit content is loaded above. If it starts with `SCOPE:<scope>`, the habit exists. If `NOT_FOUND`, it's a new habit.
+| Exists? | Input? | Action                                      |
+| ------- | ------ | ------------------------------------------- |
+| Yes     | Yes    | Apply changes to existing habit, write back |
+| Yes     | No     | Show current state, ask what to change      |
+| No      | Yes    | Create new habit from description           |
+| No      | No     | Ask what this habit should do and stop      |
 
-| Exists? | Input? | Action                                                  |
-| ------- | ------ | ------------------------------------------------------- |
-| Yes     | Yes    | Apply changes to existing habit, write back             |
-| Yes     | No     | Show current state, ask what to change                  |
-| No      | Yes    | Create new habit from description                       |
-| No      | No     | Ask what this habit should do and stop (skip steps 3-4) |
-
-3. If the table action is "Ask what to change" or "Ask what this habit should do", skip steps 3 and 4 and ask the question. Otherwise apply the Processing Rules above. Edit in the scope where it was found. To change scope, the user must explicitly request it.
-
-4. Write: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh write-habit <scope> <id> '<frontmatter+body>'`. Confirm: "Created habit [id]. Tags: [tags]. [description]. ([scope])." or "Updated habit [id]: what changed."
-
-5. Verify: run `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id>` and confirm the id, description, and tags match what you intended. If not, rewrite.
+2. If the action is "ask", ask and stop. Otherwise apply the Processing Rules above. Edit in the scope where it was found. To change scope, the user must explicitly request it.
+3. Write:
+   ```bash
+   bash "$HABIT_BIN" write-habit <scope> <id> '<frontmatter+body>'
+   ```
+   Confirm: "Created habit [id]. Tags: [tags]. [description]. ([scope])." or "Updated habit [id]: what changed."
+4. Verify:
+   ```bash
+   bash "$HABIT_BIN" read-habit <id>
+   ```
+   Confirm id, description, and tags match intent. If not, rewrite.

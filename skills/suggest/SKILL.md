@@ -1,35 +1,51 @@
 ---
-name: suggest
+name: habit-suggest
 description: "Use when the user wants to apply relevant habits to their request without naming them individually. Triggers on: suggest habits, apply habits, help with [task] using habits."
 argument-hint: "<request>"
 allowed-tools: Bash(bash:*)
 ---
 
-# /habit:suggest: Surface & Apply
+# Habit Suggest: Surface & Apply
+
+## Setup
+
+Run this once and reuse the values below. If it prints `HABIT_UNAVAILABLE`, tell the user habit is not installed or its hooks are not wired, then stop:
+
+```bash
+source "$HOME/.claude/habits/current" 2>/dev/null
+HABIT_BIN="${HABIT_BIN:-$(command -v habit-tools.sh || echo "${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/habit-tools.sh}")}"
+[ -f "${HABIT_BIN:-}" ] || echo "HABIT_UNAVAILABLE: habit is not wired on this host."
+```
 
 ## Triggers
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers ${CLAUDE_SESSION_ID}`
+Run this and show the output only if it is non-empty:
+
+```bash
+bash "$HABIT_BIN" check-triggers "$HABIT_SID"
+```
 
 ## Index (active)
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index merged active`
+Run this and use the output:
+
+```bash
+bash "$HABIT_BIN" read-index merged active
+```
 
 ## Instructions
 
-1. Parse `$ARGUMENTS` as the user's request. No arguments: `Usage: /habit:suggest <request>`. Point to `/habit`.
-
-2. Score each non-archived habit in the index above for relevance to the request. Use id, tags, and description. Select habits that would meaningfully improve how the request is addressed. Skip habits that are only tangentially related.
-
-3. If no habits are relevant, address the request directly without further ceremony.
-
-4. Load all relevant habits in one call: `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id1> <id2> ...`. Output is delimited by `---HABIT:<id>---` lines. Each section starts with `SCOPE:<scope>`. Note the scope per habit for logging. Extract the instruction body after the YAML frontmatter.
-
-5. Merge the loaded instructions into a single directive for the request. Apply all habit instructions to the request. Where two instructions conflict, the more narrowly scoped one wins. Do not execute habits sequentially; synthesize one coherent action.
-
-6. Execute the merged directive. Address the request directly. Do not announce which habits are being applied, explain the merge, or describe internal operations.
-
-7. After execution, log all applied habits in one call:
+1. Treat the user's message as the request. Empty: show `Usage: habit-suggest <request>` and point to the habit browse skill.
+2. Score each non-archived habit for relevance using id, tags, description. Select those that meaningfully improve how the request is addressed. Skip tangential ones.
+3. If none are relevant, address the request directly without ceremony.
+4. Load all relevant habits in one call:
+   ```bash
+   bash "$HABIT_BIN" read-habit <id1> <id2> ...
    ```
-   bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-exec '[{"scope":"<scope>","id":"<id>","override":"<request summary, max 80 chars>"}, ...]'
+   Output is delimited by `---HABIT:<id>---`. Each section starts with `SCOPE:<scope>`. Note the scope per habit. Extract the instruction body after the frontmatter.
+5. Merge into a single directive. Where two conflict, the more narrowly scoped wins. Synthesize one coherent action, do not run them sequentially.
+6. Execute the merged directive. Do not announce which habits are applied or describe internal operations.
+7. After execution, log all applied habits in one call:
+   ```bash
+   bash "$HABIT_BIN" log-exec '[{"scope":"<scope>","id":"<id>","override":"<request summary, max 80 chars>"}, ...]'
    ```
