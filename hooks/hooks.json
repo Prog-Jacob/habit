@@ -14,7 +14,6 @@
     ],
     "SessionStart": [
       {
-        "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
             "type": "command",
@@ -26,7 +25,7 @@
     ],
     "SessionEnd": [
       {
-        "matcher": "clear|resume|logout|prompt_input_exit",
+        "matcher": "clear|logout|prompt_input_exit",
         "hooks": [
           {
             "type": "command",

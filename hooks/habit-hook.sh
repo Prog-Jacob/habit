@@ -7,41 +7,49 @@ INPUT=$(cat 2>/dev/null || echo "")
 EVENT="${1:-}"
 [ -z "$EVENT" ] && exit 0
 
-SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# Resolve symlinks so install.sh's symlink into ~/.cursor/hooks still finds the repo.
+SELF="$0"
+while [ -L "$SELF" ]; do
+  LINK="$(readlink "$SELF")"
+  case "$LINK" in /*) SELF="$LINK" ;; *) SELF="$(dirname "$SELF")/$LINK" ;; esac
+done
+# Prefer the host's plugin root (Cursor first; it may also set the Claude alias).
+SCRIPT_DIR="${CURSOR_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
+[ -f "$SCRIPT_DIR/bin/habit-tools.sh" ] || SCRIPT_DIR="$(cd "$(dirname "$SELF")/.." && pwd)"
 HABIT_BIN="$SCRIPT_DIR/bin/habit-tools.sh"
 [ -f "$HABIT_BIN" ] || exit 0
 
-# Reuse the shared Cursor transcript locator.
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/bin/lib/common.sh" 2>/dev/null || true
 
-_field() { echo "$INPUT" | jq -r ".$1 // \"\"" 2>/dev/null || echo ""; }
+# One jq pass: extract all payload fields. \x1f delimiter survives empty fields
+# (tab-IFS would not); strip embedded \x1f and flatten prompt whitespace.
+SID="" PROMPT="" TRANSCRIPT="" WORKSPACE=""
+IFS=$'\x1f' read -r SID PROMPT TRANSCRIPT WORKSPACE < <(
+  echo "$INPUT" | jq -r '[((.session_id // .conversation_id // "") | gsub("\\x{1f}"; "")), ((.prompt // "") | gsub("[\\n\\t\\x{1f}]+"; " ")), ((.transcript_path // "") | gsub("\\x{1f}"; "")), ((.workspace_roots[0] // "") | gsub("\\x{1f}"; ""))] | @tsv | gsub("\t"; "\u001f")' 2>/dev/null
+) || true
+
 _breadcrumb_sid() { sed -n 's/^HABIT_SID=//p' "$(breadcrumb_path 2>/dev/null)" 2>/dev/null || echo ""; }
-_sid() {
-  local s; s="$(_field session_id)"; [ -z "$s" ] && s="$(_field conversation_id)"
-  [ -z "$s" ] && s="$(_breadcrumb_sid)"; echo "$s"
-}
 
 case "$EVENT" in
   session-init)
-    SID="$(_field session_id)"; [ -z "$SID" ] && SID="$(_field conversation_id)"
     [ -z "$SID" ] && SID="cursor-$(date +%s)-$$"
     bash "$HABIT_BIN" session-init "$SID" >/dev/null 2>&1 || true
     ;;
   prompt-tick)
-    SID="$(_sid)"; [ -z "$SID" ] && exit 0
-    PROMPT="$(_field prompt)"; [ -z "$PROMPT" ] && exit 0
-    TRANSCRIPT="$(_field transcript_path)"
+    [ -z "$SID" ] && SID="$(_breadcrumb_sid)"
+    [ -z "$SID" ] && exit 0
+    [ -z "$PROMPT" ] && exit 0
     # Fallback for hosts that omit transcript_path. Cursor user-hooks run from
     # ~/.cursor/, so derive the workspace from the payload, not $PWD.
     if [ -z "$TRANSCRIPT" ]; then
-      WS="$(echo "$INPUT" | jq -r '.workspace_roots[0] // ""' 2>/dev/null || echo "")"
-      TRANSCRIPT="$(cursor_transcript_path "${WS:-${PWD:-$HOME}}" 2>/dev/null || echo "")"
+      TRANSCRIPT="$(cursor_transcript_path "${WORKSPACE:-${PWD:-$HOME}}" 2>/dev/null || echo "")"
     fi
     bash "$HABIT_BIN" prompt-tick "$SID" "$TRANSCRIPT" "$PROMPT" >/dev/null 2>&1 || true
     ;;
   session-end)
-    SID="$(_sid)"; [ -z "$SID" ] && exit 0
+    [ -z "$SID" ] && SID="$(_breadcrumb_sid)"
+    [ -z "$SID" ] && exit 0
     bash "$HABIT_BIN" session-end "$SID" >/dev/null 2>&1 || true
     ;;
 esac
