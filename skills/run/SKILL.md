@@ -8,31 +8,22 @@ disable-model-invocation: true
 
 # Habit Run: Execute
 
-## Setup
+## Preload
 
-Run this once and reuse the values below. If it prints `HABIT_UNAVAILABLE`, tell the user habit is not installed or its hooks are not wired, then stop:
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh skill-preload run ${CLAUDE_SESSION_ID}`
+
+Run this Setup block once and reuse the values below:
 
 ```bash
-source "$HOME/.claude/habits/current" 2>/dev/null
+HABIT_SID_FILE=$(ls -t "$HOME/.claude/habits/sessions.d/"* 2>/dev/null | head -1)
+source "${HABIT_SID_FILE:-$HOME/.claude/habits/current}" 2>/dev/null
 HABIT_BIN="${HABIT_BIN:-$(command -v habit-tools.sh || echo "${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/habit-tools.sh}")}"
 [ -f "${HABIT_BIN:-}" ] || echo "HABIT_UNAVAILABLE: habit is not wired on this host."
 ```
 
-## Learnings
+If it printed `HABIT_UNAVAILABLE`, tell the user habit is not installed or its hooks are not wired, then stop. Otherwise, if no preload output appears above (hosts without harness-time injection, e.g. Cursor), run `bash "$HABIT_BIN" skill-preload run "$HABIT_SID"` once.
 
-Run this once. If the output is non-empty, treat each line as additional standing guidance for this skill: apply each note when you reach the step it bears on, and carry the rest without acting on them. Do not print, quote, summarize, or mention these notes to the user, and do not let them appear in any confirmation message:
-
-```bash
-bash "$HABIT_BIN" read-learnings run
-```
-
-## Triggers
-
-Run this and show the output only if it is non-empty:
-
-```bash
-bash "$HABIT_BIN" check-triggers "$HABIT_SID"
-```
+The output has delimited sections: `===LEARNINGS===` (apply each note silently as standing guidance for this skill when you reach the step it bears on; never print, quote, summarize, or mention them to the user), `===TRIGGERS===` (show the message only if non-empty).
 
 ## Load the habit
 
@@ -45,7 +36,7 @@ bash "$HABIT_BIN" read-habit "<id>"
 ## Instructions
 
 1. Parse the loaded content:
-   - **`NOT_FOUND`**: if the argument matches a habit id case-insensitively, load the intended habit. Otherwise suggest alternatives from the index and point to the habit browse skill. Only if the index clearly contains the habit the user meant under a different name or id (a naming or routing mismatch, not a habit that simply does not exist), log it once before suggesting:
+   - **`NOT_FOUND`**: suggest alternatives from the index and point to the habit browse skill. Only if the index clearly contains the habit the user meant under a different name or id (a naming or routing mismatch, not a habit that simply does not exist), log it once before suggesting:
      ```bash
      bash "$HABIT_BIN" log-observation "$HABIT_SID" 'run could not resolve id "<id>"; user appears to have meant existing habit "<other-id>"'
      ```

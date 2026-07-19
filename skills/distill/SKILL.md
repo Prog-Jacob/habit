@@ -16,7 +16,8 @@ Runs in an isolated fork. Use only the commands in the Operations reference for 
 Run this once and reuse the values below. If it prints `HABIT_UNAVAILABLE`, tell the user habit is not installed or its hooks are not wired, then stop:
 
 ```bash
-source "$HOME/.claude/habits/current" 2>/dev/null
+HABIT_SID_FILE=$(ls -t "$HOME/.claude/habits/sessions.d/"* 2>/dev/null | head -1)
+source "${HABIT_SID_FILE:-$HOME/.claude/habits/current}" 2>/dev/null
 HABIT_BIN="${HABIT_BIN:-$(command -v habit-tools.sh || echo "${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/habit-tools.sh}")}"
 [ -f "${HABIT_BIN:-}" ] || echo "HABIT_UNAVAILABLE: habit is not wired on this host."
 ```
@@ -37,7 +38,7 @@ Run this ONE command and read its full output before doing anything else. Do NOT
 bash "$HABIT_BIN" distill-preload "$HABIT_SID"
 ```
 
-The output has delimited sections, in order: `===TRANSCRIPT===` (this session's user prompts), `===INDEX===` (merged index), `===PENDING===` (prior sessions), `===LOG===` (execution log), `===META-GLOBAL===`, `===META-PROJECT===`, `===PROCESSING===` (the processing rules), `===OPERATIONS===` (the operations reference). If any section is missing, run the command again before continuing.
+The output has delimited sections, in order: `===TRANSCRIPT===` (this session's user prompts), `===INDEX===` (merged index), `===PENDING===` (prior sessions), `===LOG===` (execution log), `===META-GLOBAL===`, `===META-PROJECT===`, `===PROCESSING===` (the processing rules), `===OPERATIONS===` (the operations reference).
 
 ## Routing
 
@@ -49,7 +50,7 @@ The argument is the user's message (`maintain`, `project`, or empty).
 bash "$HABIT_BIN" log-observation "$HABIT_SID" '<feedback>'
 ```
 
-Pick the first matching branch. Do not read or execute other branches. **Only the Project branch may call `list-new-sessions` and `read-sessions`.** Maintain and Regular work only with the preloaded data.
+Pick the first matching branch. Do not read or execute other branches. **Only the Project branch may call `list-new-sessions`.** Maintain and Regular work only with the preloaded data.
 
 1. Message contains "project" go to Project.
 2. Message contains "maintain", "pending", or "deep" go to Maintain.
@@ -61,7 +62,7 @@ Pick the first matching branch. Do not read or execute other branches. **Only th
 
 Scan new or modified project sessions incrementally, then restructure. This branch loads session data fresh; the preloaded transcript does not apply here, but the other preloaded sections (index, log, metadata, processing, operations) still do.
 
-1. List: `bash "$HABIT_BIN" list-new-sessions`. If "No new project sessions." or "No project sessions found.", return that and stop.
+1. List: `bash "$HABIT_BIN" list-new-sessions "$HABIT_SID"`. If "No new project sessions." or "No project sessions found.", return that and stop.
 2. Collect the file paths (one per line). Split into batches of 5.
 3. Per batch, load `bash "$HABIT_BIN" read-transcript <p1> ... <p5>`, run Sweep, then `bash "$HABIT_BIN" mark-sessions-distilled <p1> ... <p5>`.
 4. Run Restructure.
@@ -105,9 +106,8 @@ On a `source` env-context only, you may append a "Proposed source edits" section
 1. Apply the Processing Rules: classify, interpret, dedup, structure. Extract the generalizable principle, scope it.
 2. Write or merge each reusable pattern via `write-habit`.
 3. Check the log for override patterns (3+ similar on one habit). List them.
-4. Verify each written habit with `read-habit <id>`: valid frontmatter, verb-first description under 120 chars, self-contained instruction. Rewrite if not.
-5. Verify unique ids, lowercase singular tags, no two habits with identical behavior.
-6. Flag plugin friction as observations via `log-observation`.
+4. Verify unique ids, lowercase singular tags, no two habits with identical behavior.
+5. Flag plugin friction as observations via `log-observation`.
 
 ## Restructure
 
@@ -123,7 +123,7 @@ On a `source` env-context only, you may append a "Proposed source edits" section
 ## Self-improve
 
 1. Run `bash "$HABIT_BIN" read-observations`. If the output is exactly `No observations.`, skip this entire section and do NOT clear observations.
-2. For each actionable observation, write one learning as a direct imperative the target skill can follow at runtime (an instruction it could paste into its own steps), against the responsible target (`run`, `suggest`, `distill`, `edit`, `habit`, or `global`). Prefer the most specific target; use `global` only for guidance that genuinely applies to every skill. Skip observations that do not translate into a concrete runtime behavior, and note them in the summary.
+2. For each actionable observation, write one learning as a direct imperative the target skill can follow at runtime (an instruction it could paste into its own steps), against the responsible target (`run`, `suggest`, `distill`, `edit`, `habit`, or `global`; watch is intentionally learning-free). Prefer the most specific target; use `global` only for guidance that genuinely applies to every skill. Skip observations that do not translate into a concrete runtime behavior, and note them in the summary.
    ```bash
    bash "$HABIT_BIN" write-learning <target> '<imperative one-line rule the skill can act on>' '<the observation that produced it>'
    ```

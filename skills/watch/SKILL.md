@@ -1,31 +1,37 @@
 ---
 name: habit-watch
 description: "Use when the user wants to check, pause, or resume automatic habit capture. Triggers on: watch status, stop watching, pause capture, resume capture."
-argument-hint: "[off|status]"
+argument-hint: "[start|stop|status]"
 allowed-tools: Bash(bash:*)
 disable-model-invocation: true
 ---
 
 # Habit Watch: Observation Control
 
-Watch is always active by default. This skill lets you check status, pause, or resume.
+Watch is always active by default. This skill lets you check status, pause, or resume. Capture control is deliberately static: watch has no learnings overlay, by design.
 
-## Setup
+## Preload
 
-Run this once and reuse the values below. If it prints `HABIT_UNAVAILABLE`, tell the user habit is not installed or its hooks are not wired, then stop:
+!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh skill-preload watch ${CLAUDE_SESSION_ID}`
+
+Run this Setup block once and reuse the values below:
 
 ```bash
-source "$HOME/.claude/habits/current" 2>/dev/null
+HABIT_SID_FILE=$(ls -t "$HOME/.claude/habits/sessions.d/"* 2>/dev/null | head -1)
+source "${HABIT_SID_FILE:-$HOME/.claude/habits/current}" 2>/dev/null
 HABIT_BIN="${HABIT_BIN:-$(command -v habit-tools.sh || echo "${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/habit-tools.sh}")}"
 [ -f "${HABIT_BIN:-}" ] || echo "HABIT_UNAVAILABLE: habit is not wired on this host."
 ```
 
+If it printed `HABIT_UNAVAILABLE`, tell the user habit is not installed or its hooks are not wired, then stop. Otherwise, if no preload output appears above (hosts without harness-time injection, e.g. Cursor), run `bash "$HABIT_BIN" skill-preload watch "$HABIT_SID"` once.
+
+The output has a `===TRIGGERS===` section: show the message only if non-empty.
+
 ## Resolve state
 
-Run these and use the outputs (triggers message, then `ACTIVE` or `PAUSED`, then the count):
+Run these and use the outputs (`ACTIVE` or `PAUSED`, then the count):
 
 ```bash
-bash "$HABIT_BIN" check-triggers "$HABIT_SID"
 bash "$HABIT_BIN" watch status "$HABIT_SID"
 bash "$HABIT_BIN" read-prompt-count "$HABIT_SID"
 ```
