@@ -1,6 +1,6 @@
 # Habit Processing Rules
 
-All habit commands that create, modify, or inspect habits follow these rules. Do not announce internal operations to the user. Show only the final result.
+Invoke every command as `bash "$HABIT_BIN" <subcommand> ...`. All habit commands that create, modify, or inspect habits follow these rules. Do not announce internal operations to the user. Show only the final result.
 
 ## 1. Interpretation
 
@@ -32,7 +32,7 @@ A prompt is **one-off** if it:
 
 ## 3. Deduplication
 
-Compare new candidate against the preloaded index (descriptions + tags) by intent, not wording. Only load full content via `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id>` when two habits look close enough that the description alone cannot distinguish them.
+Compare new candidate against the preloaded index (descriptions + tags) by intent, not wording. Only load full content via `read-habit <id>` when two habits look close enough that the description alone cannot distinguish them.
 
 - **Skip:** Candidate and existing habit would produce the same agent behavior. Only wording differs. Note in the summary that it's already covered.
 - **Merge:** Candidate adds steps or context the existing habit lacks, but they target the same workflow. Preserve intent from both. Update `updated` timestamp.

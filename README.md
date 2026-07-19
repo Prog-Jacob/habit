@@ -32,9 +32,9 @@ Requires [jq](https://jqlang.github.io/jq/), and either [Claude Code](https://co
 /plugin install habit@habit
 ```
 
-**Cursor (2.5+):** use the manual install below.
+**Cursor (2.5+):** install via Cursor's plugin marketplace, using the manifest in `.cursor-plugin/`. Hook commands in `hooks.cursor.json` are plugin-root-relative, so a marketplace install wires capture with no path edits. Use the manual install below as a fallback where marketplace install isn't available yet.
 
-**Manual (any version of either tool):**
+**Manual (fallback, any version of either tool):**
 
 ```
 git clone https://github.com/Prog-Jacob/habit.git
@@ -93,7 +93,7 @@ Pick by number or name. Add context to narrow a run (e.g., `1 only in auth`).
 | `/habit:suggest <request>`       | Surface relevant habits for a request, merge their instructions, and address it directly.                      |
 | `/habit:distill`                 | Sweep the current session and any pending prior sessions. Classifies, deduplicates, writes or merges habits.   |
 | `/habit:distill maintain`        | Regular sweep plus full inventory restructure: merge convergent habits, normalize tags, archive stale entries. |
-| `/habit:distill project`         | Scan all project sessions and restructure the full inventory.                                                  |
+| `/habit:distill project`         | Scan new or modified project sessions and restructure the full inventory.                                      |
 | `/habit:watch`                   | Check observation status and prompt count for the current session.                                             |
 | `/habit:watch off`               | Pause observation. Resumes automatically next session.                                                         |
 
@@ -103,7 +103,7 @@ Pick by number or name. Add context to narrow a run (e.g., `1 only in auth`).
 
 **Hooks** fire on every session. `SessionStart` registers the session. `UserPromptSubmit` increments a prompt counter (skips prompts under 5 words) and records the transcript path. `SessionEnd` saves a breadcrumb for later distill if any prompts were captured.
 
-**Distill** runs in a forked subagent. It preloads the current transcript, the merged habit index, pending sessions, execution log, and metadata. It classifies each prompt as reusable or one-off, deduplicates against existing habits, and writes new or merged entries. Every sweep also runs self-improvement (below). `maintain` adds a full restructure pass: merging convergent habits, normalizing tags, and archiving stale entries. `project` scans all `.jsonl` session files for the current working directory.
+**Distill** runs in a forked subagent. It preloads the current transcript, the merged habit index, pending sessions, execution log, and metadata. It classifies each prompt as reusable or one-off, deduplicates against existing habits, and writes new or merged entries. Every sweep also runs self-improvement (below). `maintain` adds a full restructure pass: merging convergent habits, normalizing tags, and archiving stale entries. `project` scans new or modified `.jsonl` session files for the current working directory.
 
 **Self-improvement.** When a skill hits friction (a misroute, or a missing tool or path), it records an observation. Distill turns each actionable observation into a _learning_: a short standing note aimed at the skill it concerns, stored in `settings.local.json` next to your habits. Each skill reads its learnings on the next run and applies them as extra guidance. Because the overlay lives in your data directory rather than the plugin files, it survives updates and behaves identically on Claude Code and Cursor.
 

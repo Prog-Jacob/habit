@@ -1,36 +1,35 @@
 # Habit Operations Reference
 
-All habit data goes through `habit-tools.sh`. Do not use Read, Write, Glob, or Grep on habit files directly. If you need data that isn't preloaded, call the appropriate command below.
+All habit data goes through `habit-tools.sh`. Invoke every command as `bash "$HABIT_BIN" <subcommand> ...`. Do not use Read, Write, Glob, or Grep on habit files directly. If you need data that isn't preloaded, call the appropriate command below.
 
 ## Commands
 
-- **Read habit(s):** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-habit <id> [<id2> ...]`. Single ID returns `SCOPE:<scope>` + content. Multiple IDs returns `---HABIT:<id>---` delimited sections.
-- **Write a habit:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh write-habit <scope> <id> '<frontmatter+body>'` (or pipe content via stdin)
-- **Log execution:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-exec <scope> <id> '<override>'` for a single habit, or `bash ... log-exec '[{"scope":"...","id":"...","override":"..."}]'` for batch (one state write per scope).
-- **Self-heal:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh self-heal <scope>`
-- **Reset meta (after deep distill):** zero the update counter and set last deep timestamp. `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-meta <scope>`
-- **Prune log (after deep distill):** truncate to last 25 entries. `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh prune-log <scope>`
+- **Read habit(s):** `read-habit <id> [<id2> ...]`. Single ID returns `SCOPE:<scope>` + content. Multiple IDs returns `---HABIT:<id>---` delimited sections.
+- **Write a habit:** `write-habit <scope> <id> '<frontmatter+body>'` (or pipe content via stdin)
+- **Log execution:** `log-exec <scope> <id> '<override>'` for a single habit, or `log-exec '[{"scope":"...","id":"...","override":"..."}]'` for batch (one state write per scope).
+- **Self-heal:** `self-heal <scope>`
+- **Reset meta (after deep distill):** zero the update counter and set last deep timestamp. `reset-meta <scope>`
+- **Prune log (after deep distill):** truncate to last 25 entries. `prune-log <scope>`
 
 ## Query commands
 
 Read-only. Most are pre-loaded in skills that need them.
 
-- **Read index:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-index <merged|global|project> [active]`. With `active`: non-archived entries only, compact format (id, tags, description, scope).
-- **Read metadata:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-meta <global|project>`
-- **Read execution log:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-log`
-- **Read pending sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-pending-distill`
-- **Read transcript:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-transcript <path> [<path2> ...]`. Single path returns content directly. Multiple paths returns `---SESSION:<path>---` delimited sections (skips missing files).
-- **Read all project sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-sessions` **(Only in distill Project branch. Forbidden in Maintain and Regular.)**
-- **List new sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh list-new-sessions`. Returns file paths of new or modified project sessions (not yet distilled or modified since last distill). **(Only in distill Project branch.)**
-- **Read prompt count:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-prompt-count <session_id>`
-- **Check triggers:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh check-triggers <session_id>`
+- **Read index:** `read-index <merged|global|project> [active]`. With `active`: non-archived entries only, compact format (id, tags, description, scope).
+- **Read metadata:** `read-meta <global|project>`
+- **Read execution log:** `read-log`
+- **Read pending sessions:** `read-pending-distill`
+- **Read transcript:** `read-transcript <path> [<path2> ...]`. Single path returns content directly. Multiple paths returns `---SESSION:<path>---` delimited sections (skips missing files).
+- **List new sessions:** `list-new-sessions "$HABIT_SID"`. Returns file paths of new or modified project sessions (not yet distilled or modified since last distill); the sid excludes the live session's transcript. **(Only in distill Project branch.)**
+- **Read prompt count:** `read-prompt-count <session_id>`
+- **Check triggers:** `check-triggers <session_id>`
 
 ## Cleanup commands
 
-- **Reset prompt count:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh reset-prompt-count <session_id>`
-- **Clear pending sessions:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-pending-distill`
-- **Mark sessions distilled:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh mark-sessions-distilled <path1> [<path2> ...]`. Records file mtimes as watermarks for incremental project distill.
-- **Clear observations:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh clear-observations`
+- **Reset prompt count:** `reset-prompt-count <session_id>`
+- **Clear pending sessions:** `clear-pending-distill`
+- **Mark sessions distilled:** `mark-sessions-distilled <path1> [<path2> ...]`. Records file mtimes as watermarks for incremental project distill.
+- **Clear observations:** `clear-observations`
 
 ## Observation commands
 
@@ -38,8 +37,8 @@ During any operation, if you encounter friction that stems from the plugin itsel
 
 Do not log user preferences (those are habits), one-off environment issues, or general LLM limitations.
 
-- **Log observation:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh log-observation <session_id> '<signal>'`. Single-quote the signal.
-- **Read observations:** `bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh read-observations`
+- **Log observation:** `log-observation <session_id> '<signal>'`. Single-quote the signal.
+- **Read observations:** `read-observations`
 
 ## Output discipline
 
