@@ -3,7 +3,7 @@
 cmd_session_init() {
   require_session_id "${1:-}"
   local session_id="$1"
-  ensure_dir "$GLOBAL_DIR"
+  mkdir -p "$GLOBAL_DIR"
   local now
   now=$(now_utc)
   local cutoff
@@ -20,14 +20,11 @@ cmd_session_init() {
 cmd_session_end() {
   require_session_id "${1:-}"
   local session_id="$1"
-  ensure_dir "$GLOBAL_DIR"
+  mkdir -p "$GLOBAL_DIR"
 
-  local info
-  info=$(read_state "$GLOBAL_DIR" | jq -r --arg sid "$session_id" \
-    '[(.sessions[$sid].prompt_count // 0), (.sessions[$sid].transcript_path // "")] | @tsv')
   local pc tp
-  pc=$(echo "$info" | cut -f1)
-  tp=$(echo "$info" | cut -f2)
+  IFS=$'\t' read -r pc tp < <(read_state "$GLOBAL_DIR" | jq -r --arg sid "$session_id" \
+    '[(.sessions[$sid].prompt_count // 0), (.sessions[$sid].transcript_path // "")] | @tsv') || true
 
   if [ "$pc" -gt 0 ] && [ -n "$tp" ] && [ -f "$tp" ]; then
     local timestamp
@@ -40,14 +37,14 @@ cmd_session_end() {
     update_state "$GLOBAL_DIR" jq --arg sid "$session_id" 'del(.sessions[$sid])'
   fi
 
-  clear_breadcrumb
+  clear_breadcrumb "$session_id"
   echo "OK session ended"
 }
 
 cmd_prompt_tick() {
   require_session_id "${1:-}"
   local session_id="$1"
-  ensure_dir "$GLOBAL_DIR"
+  mkdir -p "$GLOBAL_DIR"
   local transcript="${2:-}"
   local prompt="${3:-}"
 
@@ -55,6 +52,11 @@ cmd_prompt_tick() {
   local words
   words=$(echo "$prompt" | wc -w | tr -d ' ')
   [ "$words" -lt 5 ] && exit 0
+
+  # Lazy init for hosts that skip sessionStart (e.g. Cursor cloud agents).
+  if [ "$(read_state "$GLOBAL_DIR" | jq -r --arg sid "$session_id" '.sessions | has($sid)')" != "true" ]; then
+    cmd_session_init "$session_id" >/dev/null
+  fi
 
   update_state "$GLOBAL_DIR" jq --arg sid "$session_id" --arg tp "$transcript" \
     'if (.sessions[$sid].watch_paused // false) then .

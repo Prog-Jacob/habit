@@ -13,10 +13,6 @@ require_jq() {
   command -v jq &>/dev/null || { echo "Error: jq is required but not installed" >&2; exit 1; }
 }
 
-ensure_dir() {
-  [ -d "$1" ] || mkdir -p "$1"
-}
-
 resolve_dir() {
   case "$1" in
     global)  echo "$GLOBAL_DIR" ;;
@@ -39,29 +35,19 @@ require_session_id() {
 
 now_utc() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 
-if stat -f "%m" /dev/null &>/dev/null 2>&1; then
-  _file_mtime() { stat -f "%m" "$1"; }
-else
-  _file_mtime() { stat -c "%Y" "$1"; }
-fi
+_file_mtime() { stat -f "%m" "$1" 2>/dev/null || stat -c "%Y" "$1"; }
 
-# List every Cursor agent transcript for a workspace.
-# Cursor stores them at agent-transcripts/<uuid>/<uuid>.jsonl; subagent
-# transcripts are excluded. Single source of the path scheme and find.
-# Usage: cursor_transcript_files [workspace_path]
+# Cursor transcript files for a workspace (excludes subagent transcripts).
 cursor_transcript_files() {
   local workspace="${1:-$PWD}"
   local dir="$HOME/.cursor/projects/$(echo "${workspace#/}" | tr '/' '-')/agent-transcripts"
   find "$dir" -maxdepth 2 -name "*.jsonl" -not -path "*/subagents/*" 2>/dev/null
 }
 
-# Claude Code stores project sessions under a slugified workspace path.
-# Single source of that scheme, mirroring cursor_transcript_files.
-# Usage: claude_project_dir [workspace_path]
+# Claude Code project dir for a workspace (slugified path).
 claude_project_dir() { echo "$HOME/.claude/projects/$(echo "${1:-$PWD}" | tr '/' '-')"; }
 
-# Most recent Cursor agent transcript for a workspace, or empty.
-# Usage: cursor_transcript_path [workspace_path]
+# Most recent Cursor transcript for a workspace, or empty.
 cursor_transcript_path() {
   local found
   found=$(cursor_transcript_files "${1:-$PWD}")
@@ -69,17 +55,27 @@ cursor_transcript_path() {
   echo "$found" | xargs ls -t 2>/dev/null | head -1 || echo ""
 }
 
-# Session breadcrumb: lets skills resolve the tool path and session id portably,
-# independent of host (Claude Code or Cursor). Lives in the existing data dir.
-# Written by the session-start hook path; read by skills via `source`.
+# Per-session breadcrumbs under sessions.d/<sid>, plus a best-effort `current`
+# (last-started). Skills source the newest sessions.d entry.
 breadcrumb_path() { echo "$GLOBAL_DIR/current"; }
+session_breadcrumb_path() { echo "$GLOBAL_DIR/sessions.d/$1"; }
 
 write_breadcrumb() {
   local session_id="${1:-}"
-  ensure_dir "$GLOBAL_DIR"
+  mkdir -p "$GLOBAL_DIR/sessions.d"
   local body
   body=$(printf 'HABIT_BIN=%s\nHABIT_SID=%s\n' "$SCRIPT_DIR/habit-tools.sh" "$session_id")
+  printf '%s' "$body" | atomic_write_file "$(session_breadcrumb_path "$session_id")"
   printf '%s' "$body" | atomic_write_file "$(breadcrumb_path)"
+  # Reap breadcrumbs from sessions that never ended: same 24h cutoff as state.
+  find "$GLOBAL_DIR/sessions.d" -type f -mmin +1440 -delete 2>/dev/null || true
 }
 
-clear_breadcrumb() { rm -f "$(breadcrumb_path)" 2>/dev/null || true; }
+# Remove this session's breadcrumb; clear `current` only if it matches.
+clear_breadcrumb() {
+  local session_id="${1:-}"
+  [ -n "$session_id" ] && rm -f "$(session_breadcrumb_path "$session_id")" 2>/dev/null
+  if grep -q "^HABIT_SID=${session_id}\$" "$(breadcrumb_path)" 2>/dev/null; then
+    rm -f "$(breadcrumb_path)" 2>/dev/null || true
+  fi
+}

@@ -18,7 +18,7 @@ case "$cmd" in
   read-index|read-habit|write-habit|log-exec)
     source "$SCRIPT_DIR/lib/frontmatter.sh"
     source "$SCRIPT_DIR/lib/habit.sh" ;;
-  read-meta|read-log|read-transcript|read-sessions|list-new-sessions|read-pending-distill|check-triggers)
+  read-meta|read-log|read-transcript|list-new-sessions|read-pending-distill|check-triggers)
     source "$SCRIPT_DIR/lib/query.sh" ;;
   log-observation|read-observations|clear-observations)
     source "$SCRIPT_DIR/lib/observation.sh" ;;
@@ -58,12 +58,29 @@ case "$cmd" in
       printf '\n===OPERATIONS===\n'; cmd_read_shared OPERATIONS.md 2>&1 || true
     }
     ;;
+  skill-preload)
+    source "$SCRIPT_DIR/lib/frontmatter.sh"
+    source "$SCRIPT_DIR/lib/habit.sh"
+    source "$SCRIPT_DIR/lib/query.sh"
+    source "$SCRIPT_DIR/lib/learnings.sh"
+    cmd_skill_preload() {
+      local skill="${1:?skill required}" sid="${2:-}"
+      if [ "$skill" != "watch" ]; then
+        printf '===LEARNINGS===\n'; cmd_read_learnings "$skill" 2>&1 || true
+        printf '\n'
+      fi
+      printf '===TRIGGERS===\n'; cmd_check_triggers "$sid" 2>&1 || true
+      case "$skill" in habit|suggest)
+        printf '\n===INDEX===\n'; cmd_read_index merged active 2>&1 || true ;;
+      esac
+    }
+    ;;
   self-heal|reset-meta|prune-log|clear-pending-distill|mark-sessions-distilled)
     source "$SCRIPT_DIR/lib/frontmatter.sh"
     source "$SCRIPT_DIR/lib/maintenance.sh" ;;
   *)
     echo "Usage: habit-tools.sh <command> [args]" >&2
-    echo "Commands: read-index, read-habit, read-meta, read-transcript, read-sessions, list-new-sessions, read-prompt-count, read-pending-distill, read-log, read-shared, env-context, distill-preload, session-init, session-end, prompt-tick, watch, reset-prompt-count, clear-pending-distill, mark-sessions-distilled, check-triggers, write-habit, log-exec, self-heal, reset-meta, prune-log, log-observation, read-observations, clear-observations, write-learning, read-learnings, prune-learnings" >&2
+    echo "Commands: read-index, read-habit, read-meta, read-transcript, list-new-sessions, read-prompt-count, read-pending-distill, read-log, read-shared, env-context, distill-preload, skill-preload, session-init, session-end, prompt-tick, watch, reset-prompt-count, clear-pending-distill, mark-sessions-distilled, check-triggers, write-habit, log-exec, self-heal, reset-meta, prune-log, log-observation, read-observations, clear-observations, write-learning, read-learnings, prune-learnings" >&2
     exit 1
     ;;
 esac

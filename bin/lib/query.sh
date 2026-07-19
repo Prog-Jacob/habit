@@ -8,23 +8,16 @@ cmd_read_meta() {
 }
 
 cmd_read_log() {
-  jq -n \
+  jq -n -c \
     --argjson g "$(read_state "$GLOBAL_DIR")" \
     --argjson p "$(read_state "$PROJECT_DIR")" \
-    '[$g.log[], $p.log[]] | .[]' -c
+    '$g.log[], $p.log[]'
 }
 
-# Extract clean user messages from a JSONL transcript file.
-# Handles Claude Code (type=="user", string or array content) and Cursor
-# (role=="user", array content wrapped in <timestamp>/<user_query> tags). One
-# selector covers both: the role/type union, the string-or-array content union,
-# and the wrapper strip, which is a no-op on Claude transcripts (no such tags).
-# Filters system noise, trims whitespace, caps at 100 messages.
+# Extract user messages from a Claude Code or Cursor JSONL transcript.
 _extract_user_messages() {
   local file="$1"
-  local content
-  content=$(cat "$file" 2>/dev/null) || return 1
-  echo "$content" | jq -rs '
+  jq -rs '
     [.[] | select((.role // .type) == "user") |
       {
         ts: (.timestamp // "" | if . != "" then (split("T")[1] // "" | split(".")[0] // "" | .[0:5]) else "??:??" end),
@@ -42,7 +35,7 @@ _extract_user_messages() {
       + (if (.value.text | test("habit|distill|plugin|/habit"; "i")) then " | plugin" else "" end)
       + "]\n" + .value.text
     ) | join("\n\n")
-  ' 2>/dev/null
+  ' "$file" 2>/dev/null
 }
 
 _resolve_transcript_path() {
@@ -75,37 +68,24 @@ cmd_read_pending_distill() {
   read_state "$GLOBAL_DIR" | jq '.meta.pending_sessions // []'
 }
 
-cmd_read_sessions() {
-  local project_dir
-  project_dir=$(claude_project_dir)
-
-  [ -d "$project_dir" ] || { echo "No project sessions found."; exit 0; }
-
-  local found=0
-  for jsonl_file in "$project_dir"/*.jsonl; do
-    [ -f "$jsonl_file" ] || continue
-    [ "$found" -gt 0 ] && echo "---SESSION---"
-    _extract_user_messages "$jsonl_file" || true
-    found=$((found + 1))
-  done
-
-  if [ "$found" -eq 0 ]; then echo "No project sessions found."; fi
-}
-
 cmd_list_new_sessions() {
+  local sid="${1:-}"
   local state
   state=$(read_state "$GLOBAL_DIR")
-  local watermarks pending
-  watermarks=$(echo "$state" | jq -r '.meta.distilled_project_sessions // {}')
+
+  local watermarks pending exclude
+  watermarks=$(echo "$state" | jq -r '(.meta.distilled_project_sessions // {}) | to_entries[] | "\(.key)\t\(.value)"')
   pending=$(echo "$state" | jq -r '[.meta.pending_sessions[]?.transcript_path] | join(" ")')
+  exclude=$(echo "$state" | jq -r --arg sid "$sid" '.sessions[$sid].transcript_path // ""')
 
   local new_count=0
+  local nl=$'\n' tab=$'\t'
   _emit_if_new() { # <path>
-    local f="$1" mtime stored
+    local f="$1" mtime
     [ -f "$f" ] || return 0
+    [ "$f" = "$exclude" ] && return 0
     mtime=$(_file_mtime "$f")
-    stored=$(echo "$watermarks" | jq -r --arg f "$f" '.[$f] // ""')
-    [ "$stored" = "$mtime" ] && return 0
+    case "$nl$watermarks$nl" in *"$nl$f$tab$mtime$nl"*) return 0;; esac
     case " $pending " in *" $f "*) return 0;; esac
     echo "$f"
     new_count=$((new_count + 1))
@@ -120,10 +100,12 @@ cmd_list_new_sessions() {
     done
   fi
 
-  # Cursor agent transcripts for this workspace (canonical paths, no /..)
-  while IFS= read -r f; do
-    _emit_if_new "$f"
-  done < <(cursor_transcript_files "$PWD")
+  # Cursor transcripts (skipped when ~/.cursor absent).
+  if [ -d "$HOME/.cursor" ]; then
+    while IFS= read -r f; do
+      _emit_if_new "$f"
+    done < <(cursor_transcript_files "$PWD")
+  fi
 
   if [ "$new_count" -eq 0 ]; then echo "No new project sessions."; fi
 }
@@ -134,8 +116,6 @@ cmd_check_triggers() {
   local state
   state=$(read_state "$GLOBAL_DIR")
 
-  # Coerce to an integer in jq: a corrupt non-numeric prompt_count would
-  # otherwise abort the bash `-ge` test under `set -euo pipefail`.
   local pc=0
   if [ -n "$session_id" ]; then
     pc=$(echo "$state" | jq -r --arg sid "$session_id" \
@@ -145,12 +125,10 @@ cmd_check_triggers() {
   local pending
   pending=$(echo "$state" | jq -r '(.meta.pending_sessions // []) | length')
 
-  # Fire when there is unprocessed input: the current session crossed the
-  # prompt threshold, prior sessions are pending, or new project sessions exist.
   local has_new=0
-  [ "$(cmd_list_new_sessions)" = "No new project sessions." ] || has_new=1
+  [ "$(cmd_list_new_sessions "$session_id")" = "No new project sessions." ] || has_new=1
 
   if [ "$pc" -ge "$PROMPT_THRESHOLD" ] || [ "$pending" -gt 0 ] || [ "$has_new" -eq 1 ]; then
-    echo "Habit maintenance available. Run \`/habit:distill\` to process."
+    echo "Habit maintenance available: run the distill habit to process new sessions."
   fi
 }
