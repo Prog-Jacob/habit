@@ -35,14 +35,8 @@ build_index_entry() {
   local file="$1"
   parse_frontmatter "$file"
 
-  # Strip brackets from tags field: "[tag1, tag2]" -> "tag1, tag2"
   local raw_tags="${fm_tags#[}"
   raw_tags="${raw_tags%]}"
-
-  local tags_json="[]"
-  if [ -n "$raw_tags" ]; then
-    tags_json=$(echo "$raw_tags" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | jq -R . | jq -s .)
-  fi
 
   local archived_val="false"
   [ "$fm_archived" = "true" ] && archived_val="true"
@@ -53,13 +47,15 @@ build_index_entry() {
 
   jq -n \
     --arg id "$fm_id" \
-    --argjson tags "$tags_json" \
+    --arg rawtags "$raw_tags" \
     --arg description "$desc" \
     --arg scope "$fm_scope" \
     --arg created "$fm_created" \
     --arg updated "$fm_updated" \
     --argjson archived "$archived_val" \
     --arg last_executed "$fm_last_executed" \
-    '{id: $id, tags: $tags, description: $description, scope: $scope, created: $created, updated: $updated, archived: $archived}
+    '{id: $id,
+      tags: ($rawtags | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))),
+      description: $description, scope: $scope, created: $created, updated: $updated, archived: $archived}
      | if $last_executed != "" then .last_executed = $last_executed else . end'
 }

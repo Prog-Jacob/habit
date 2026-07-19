@@ -1,8 +1,9 @@
 # habit.sh: Habit CRUD operations.
 
-# Resolve a habit id to "scope path" or return 1 if not found.
+# Resolve "<id> [override words]" to "scope path"; trims at first space, lowercases.
 _resolve_habit() {
   local id="${1%% *}"
+  id=$(printf '%s' "$id" | tr '[:upper:]' '[:lower:]')
   if [ -f "$PROJECT_DIR/$id.md" ]; then
     echo "project $PROJECT_DIR/$id.md"
   elif [ -f "$GLOBAL_DIR/$id.md" ]; then
@@ -78,9 +79,17 @@ cmd_write_habit() {
   local dir
   dir=$(resolve_dir "$scope")
 
-  ensure_dir "$dir"
+  mkdir -p "$dir"
 
   local content="${3:-$(cat)}"
+
+  local tmp
+  tmp=$(mktemp)
+  printf '%s\n' "$content" >"$tmp"
+  parse_frontmatter "$tmp"
+  rm -f "$tmp"
+  [ "$fm_id" = "$id" ] || { echo "Frontmatter id '${fm_id:-missing}' does not match $id" >&2; exit 1; }
+  [ -n "$fm_description" ] || { echo "Missing frontmatter description for $id" >&2; exit 1; }
 
   local habit_file="$dir/$id.md"
   printf '%s\n' "$content" | atomic_write_file "$habit_file"
@@ -95,42 +104,13 @@ cmd_write_habit() {
 }
 
 cmd_log_exec() {
-  # Batch mode: first arg is JSON array
   if [[ "$1" == \[* ]]; then
     _log_exec_batch "$1"
-    return
+  else
+    _log_exec_batch "$(jq -nc --arg scope "$1" --arg id "$2" --arg override "${3:-}" \
+      '[{scope: $scope, id: $id, override: $override}]')" >/dev/null
+    echo "OK"
   fi
-
-  local scope="$1"
-  local id="$2"
-  local override="${3:-}"
-  local dir
-  dir=$(resolve_dir "$scope")
-
-  ensure_dir "$dir"
-
-  local timestamp
-  timestamp=$(now_utc)
-
-  local jq_expr='.index = [.index[] | if .id == $id then .last_executed = $ts else . end]'
-  local jq_args=(--arg id "$id" --arg ts "$timestamp")
-
-  if [ -n "$override" ]; then
-    local log_entry
-    log_entry=$(jq -n \
-      --arg id "$id" \
-      --arg override "$override" \
-      --arg timestamp "$timestamp" \
-      --arg scope "$scope" \
-      '{id: $id, override: $override, timestamp: $timestamp, scope: $scope}')
-    jq_args+=(--argjson entry "$log_entry")
-    jq_expr="$jq_expr | .log += [\$entry]"
-  fi
-
-  update_state "$dir" jq "${jq_args[@]}" "$jq_expr"
-  _update_frontmatter_timestamp "$dir/$id.md" "$timestamp"
-
-  echo "OK"
 }
 
 _log_exec_batch() {
@@ -144,7 +124,7 @@ _log_exec_batch() {
   for scope in $(echo "$entries_json" | jq -r '[.[].scope] | unique | .[]'); do
     local dir
     dir=$(resolve_dir "$scope")
-    ensure_dir "$dir"
+    mkdir -p "$dir"
 
     local group
     group=$(echo "$entries_json" | jq -c --arg s "$scope" '[.[] | select(.scope == $s)]')

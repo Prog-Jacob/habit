@@ -5,7 +5,7 @@ cmd_write_learning() {
   local target="${1:-}" note="${2:-}" origin="${3:-}"
   [ -z "$target" ] && { echo "Error: target required" >&2; exit 1; }
   [ -z "$note" ] && { echo "Error: note required" >&2; exit 1; }
-  ensure_dir "$GLOBAL_DIR"
+  mkdir -p "$GLOBAL_DIR"
   update_state "$GLOBAL_DIR" jq \
     --arg t "$target" --arg n "$note" --arg o "$origin" --arg ts "$(now_utc)" \
     '.learnings = ((.learnings // []) + [{target:$t, note:$n, origin:$o, created:$ts}])'

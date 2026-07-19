@@ -4,7 +4,7 @@ cmd_log_observation() {
   local session_id="${1:-}"
   local signal="${2:-}"
   [ -z "$signal" ] && { echo "Error: signal required" >&2; exit 1; }
-  ensure_dir "$GLOBAL_DIR"
+  mkdir -p "$GLOBAL_DIR"
 
   update_state "$GLOBAL_DIR" jq \
     --arg ts "$(now_utc)" --arg sig "$signal" --arg sid "$session_id" \
