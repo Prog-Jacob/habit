@@ -10,14 +10,16 @@ SKILLS="$REPO_ROOT/skills"
 
 # --- Skill dialect lint ---
 
-@test "no skill uses load-time inline bash execution" {
-  run grep -rl '!`' "$SKILLS" --include=SKILL.md
-  [ -z "$output" ]
-}
-
-@test "no skill references CLAUDE_SESSION_ID" {
-  run grep -rl 'CLAUDE_SESSION_ID' "$SKILLS" --include=SKILL.md
-  [ -z "$output" ]
+@test "every skill except distill carries a harness-time skill-preload line" {
+  local bad=""
+  for s in habit run edit suggest watch; do
+    grep -qF 'habit-tools.sh skill-preload' "$SKILLS/$s/SKILL.md" \
+      && grep -q 'CLAUDE_SESSION_ID' "$SKILLS/$s/SKILL.md" || bad="$bad $s"
+  done
+  [ -z "$bad" ]
+  # Distill runs as a fork with its own distill-preload; no harness line there.
+  run grep -c '!`' "$SKILLS/distill/SKILL.md"
+  [ "$output" = "0" ]
 }
 
 @test "no skill body embeds a literal /habit: command reference" {
@@ -25,11 +27,11 @@ SKILLS="$REPO_ROOT/skills"
   [ -z "$output" ]
 }
 
-@test "every skill sources the breadcrumb and uses HABIT_BIN" {
+@test "every skill falls back to the session breadcrumbs and uses HABIT_BIN" {
   local bad=""
   for dir in "$SKILLS"/*/; do
     [ -f "$dir/SKILL.md" ] || continue
-    if ! grep -q 'source "$HOME/.claude/habits/current"' "$dir/SKILL.md" \
+    if ! grep -q 'sessions\.d' "$dir/SKILL.md" \
       || ! grep -q 'HABIT_BIN' "$dir/SKILL.md"; then
       bad="$bad $(basename "$dir")"
     fi
@@ -71,12 +73,12 @@ SKILLS="$REPO_ROOT/skills"
 
 # --- Learnings surfacing ---
 
-@test "every decision-surface skill reads its own learnings target" {
+@test "every decision-surface skill preloads its own learnings target" {
   local bad=""
-  for pair in habit:habit run:run edit:edit suggest:suggest distill:distill; do
-    local s="${pair%%:*}" tgt="${pair##*:}"
-    grep -qF "read-learnings $tgt" "$SKILLS/$s/SKILL.md" || bad="$bad $s"
+  for s in habit run edit suggest; do
+    grep -qF "skill-preload $s" "$SKILLS/$s/SKILL.md" || bad="$bad $s"
   done
+  grep -qF "read-learnings distill" "$SKILLS/distill/SKILL.md" || bad="$bad distill"
   [ -z "$bad" ]
 }
 

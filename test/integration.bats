@@ -1,15 +1,9 @@
 #!/usr/bin/env bats
-# Integration tests: the CLI and hook dispatcher end to end, breadcrumbs,
-# session discovery, install linking, the learnings store, env detection, and
-# robustness against malformed/corrupt inputs. Each test works inside the
-# per-test $BATS_TEST_TMPDIR, which bats removes automatically.
+# Integration tests: CLI end to end, breadcrumbs, session discovery, install
+# linking, learnings store, env detection, and robustness against corrupt
+# inputs. Hook-adapter tests live in hook.bats.
 
 load test_helper
-
-@test "should-pending is removed (prints usage)" {
-  run bash "$TOOLS" should-pending
-  assert_contains "Usage:" "$output"
-}
 
 @test "list-new-sessions finds a Cursor session with no Claude Code project dir" {
   local home="$BATS_TEST_TMPDIR/lns"
@@ -24,7 +18,7 @@ load test_helper
   refute_contains "/.." "$output"
 }
 
-@test "write_breadcrumb records HABIT_BIN and HABIT_SID" {
+@test "write_breadcrumb records HABIT_BIN and HABIT_SID per session and in current" {
   local bc="$BATS_TEST_TMPDIR/bc"
   mkdir -p "$bc"
   bash -c "
@@ -37,13 +31,22 @@ load test_helper
   run cat "$bc/current"
   assert_contains "HABIT_SID=sess-123" "$output"
   assert_contains "HABIT_BIN=$REPO_ROOT/bin/habit-tools.sh" "$output"
+  run cat "$bc/sessions.d/sess-123"
+  assert_contains "HABIT_SID=sess-123" "$output"
 }
 
-@test "clear_breadcrumb removes the breadcrumb file" {
+@test "clear_breadcrumb removes only its own session file and a matching current" {
   local bc="$BATS_TEST_TMPDIR/bc2"
-  mkdir -p "$bc"
-  printf 'HABIT_SID=x\n' > "$bc/current"
-  bash -c "source '$REPO_ROOT/bin/lib/common.sh'; GLOBAL_DIR='$bc'; clear_breadcrumb"
+  mkdir -p "$bc/sessions.d"
+  printf 'HABIT_SID=x\n' > "$bc/sessions.d/x"
+  printf 'HABIT_SID=y\n' > "$bc/sessions.d/y"
+  printf 'HABIT_SID=y\n' > "$bc/current"
+  bash -c "source '$REPO_ROOT/bin/lib/common.sh'; GLOBAL_DIR='$bc'; clear_breadcrumb x"
+  [ ! -f "$bc/sessions.d/x" ]
+  [ -f "$bc/sessions.d/y" ]
+  [ -f "$bc/current" ]
+  bash -c "source '$REPO_ROOT/bin/lib/common.sh'; GLOBAL_DIR='$bc'; clear_breadcrumb y"
+  [ ! -f "$bc/sessions.d/y" ]
   [ ! -f "$bc/current" ]
 }
 
@@ -57,34 +60,39 @@ load test_helper
   assert_contains "Habit Operations Reference" "$output"
 }
 
-@test "hook session-init writes the Claude Code session id from stdin" {
-  local home="$BATS_TEST_TMPDIR/hk"
-  echo '{"session_id":"cc-1"}' | HOME="$home" bash "$HOOK" session-init >/dev/null 2>&1
-  run cat "$home/.claude/habits/current"
-  assert_contains "HABIT_SID=cc-1" "$output"
+@test "skill-preload emits LEARNINGS, TRIGGERS, INDEX in order for an index-carrying skill" {
+  local home="$BATS_TEST_TMPDIR/sp1"
+  mkdir -p "$home/.claude/habits"
+  run bash -c "HOME='$home' bash '$TOOLS' skill-preload habit sid1"
+  assert_contains "===LEARNINGS===" "$output"
+  assert_contains "===TRIGGERS===" "$output"
+  assert_contains "===INDEX===" "$output"
+  local l t i
+  l=$(echo "$output" | grep -n '^===LEARNINGS===$' | head -1 | cut -d: -f1)
+  t=$(echo "$output" | grep -n '^===TRIGGERS===$' | head -1 | cut -d: -f1)
+  i=$(echo "$output" | grep -n '^===INDEX===$' | head -1 | cut -d: -f1)
+  [ "$l" -lt "$t" ]
+  [ "$t" -lt "$i" ]
 }
 
-@test "hook session-init generates an id when Cursor provides none" {
-  local home="$BATS_TEST_TMPDIR/hk2"
-  echo '{}' | HOME="$home" bash "$HOOK" session-init >/dev/null 2>&1
-  run cat "$home/.claude/habits/current"
-  assert_contains "HABIT_SID=cursor-" "$output"
+@test "skill-preload run emits no INDEX section" {
+  local home="$BATS_TEST_TMPDIR/sp2"
+  mkdir -p "$home/.claude/habits"
+  run bash -c "HOME='$home' bash '$TOOLS' skill-preload run sid1"
+  assert_contains "===LEARNINGS===" "$output"
+  assert_contains "===TRIGGERS===" "$output"
+  refute_contains "===INDEX===" "$output"
 }
 
-@test "hook prompt-tick increments the breadcrumb session count" {
-  local home="$BATS_TEST_TMPDIR/hk3"
-  echo '{"session_id":"cc-1"}' | HOME="$home" bash "$HOOK" session-init >/dev/null 2>&1
-  echo '{"prompt":"this is a prompt with more than five words"}' \
-    | HOME="$home" bash "$HOOK" prompt-tick >/dev/null 2>&1
-  run bash -c "HOME='$home' bash '$TOOLS' read-prompt-count cc-1"
-  [ "$output" = "1" ]
+@test "skill-preload watch emits TRIGGERS only: watch is learning-free" {
+  local home="$BATS_TEST_TMPDIR/sp3"
+  mkdir -p "$home/.claude/habits"
+  run bash -c "HOME='$home' bash '$TOOLS' skill-preload watch sid1"
+  assert_contains "===TRIGGERS===" "$output"
+  refute_contains "===LEARNINGS===" "$output"
+  refute_contains "===INDEX===" "$output"
 }
 
-@test "hook exits 0 on empty input" {
-  local home="$BATS_TEST_TMPDIR/hk4"
-  run bash -c "echo '' | HOME='$home' bash '$HOOK' prompt-tick"
-  [ "$status" -eq 0 ]
-}
 
 @test "install links the repo under a present tool's skills dir" {
   local in="$BATS_TEST_TMPDIR/install"
@@ -95,15 +103,15 @@ load test_helper
   [ -f "$in/.cursor/skills/habit-plugin/skills/habit-shared/PROCESSING.md" ]
 }
 
-@test "read-sessions survives a malformed jsonl and still emits good sessions" {
+@test "read-transcript survives a malformed jsonl and still reads good files" {
   local home="$BATS_TEST_TMPDIR/rs"
-  local ws="$home/proj"
-  mkdir -p "$ws"
-  local proj="$home/.claude/projects/$(echo "$ws" | tr '/' '-')"
-  mkdir -p "$proj"
-  printf 'this is not json\n' > "$proj/bad.jsonl"
-  echo '{"type":"user","message":{"content":"a valid user prompt with several words here"}}' > "$proj/good.jsonl"
-  run bash -c "cd '$ws' && HOME='$home' bash '$TOOLS' read-sessions"
+  mkdir -p "$home/.claude/habits"
+  printf 'this is not json\n' > "$home/bad.jsonl"
+  echo '{"type":"user","message":{"content":"a valid user prompt with several words here"}}' > "$home/good.jsonl"
+  run bash -c "HOME='$home' bash '$TOOLS' read-transcript '$home/bad.jsonl'"
+  [ "$status" -eq 0 ]
+  assert_contains "No session data yet." "$output"
+  run bash -c "HOME='$home' bash '$TOOLS' read-transcript '$home/good.jsonl'"
   [ "$status" -eq 0 ]
   assert_contains "valid user prompt" "$output"
 }

@@ -31,8 +31,14 @@ teardown() {
   [ "$status" -eq 1 ]
 }
 
-@test "_resolve_habit trims trailing text after the id" {
-  run _resolve_habit "cleanup-writing extra text"
+@test "_resolve_habit lowercases its argument" {
+  run _resolve_habit "Cleanup-Writing"
+  [ "$output" = "global $TEST_GLOBAL/cleanup-writing.md" ]
+}
+
+@test "_resolve_habit trims trailing override text, then lowercases" {
+  run _resolve_habit "Cleanup-Writing only in auth"
+  [ "$status" -eq 0 ]
   [ "$output" = "global $TEST_GLOBAL/cleanup-writing.md" ]
 }
 
@@ -249,4 +255,44 @@ MD
   run cmd_write_habit global "Bad ID" "anything"
   [ "$status" -ne 0 ]
   assert_contains "Invalid id" "$output"
+}
+
+@test "cmd_write_habit rejects a frontmatter id mismatch and writes nothing" {
+  run cmd_write_habit global mismatched-id "$(cat << 'MD'
+---
+id: other-id
+tags: [x]
+description: Something.
+scope: global
+archived: false
+---
+
+## Instruction
+
+Body.
+MD
+)"
+  [ "$status" -ne 0 ]
+  assert_contains "does not match" "$output"
+  [ ! -f "$TEST_GLOBAL/mismatched-id.md" ]
+  refute_contains "mismatched-id" "$(jq -c '.index' "$TEST_GLOBAL/settings.local.json")"
+}
+
+@test "cmd_write_habit rejects a missing description" {
+  run cmd_write_habit global no-desc "$(cat << 'MD'
+---
+id: no-desc
+tags: [x]
+scope: global
+archived: false
+---
+
+## Instruction
+
+Body.
+MD
+)"
+  [ "$status" -ne 0 ]
+  assert_contains "Missing frontmatter description" "$output"
+  [ ! -f "$TEST_GLOBAL/no-desc.md" ]
 }

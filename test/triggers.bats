@@ -70,6 +70,30 @@ check_triggers() {
   assert_contains "Habit maintenance available" "$output"
 }
 
+@test "check-triggers excludes the live session's own transcript but fires on a second one" {
+  local home="$BATS_TEST_TMPDIR/lt1"
+  mkdir -p "$home/.claude/habits"
+  local ws="$home/work"
+  mkdir -p "$ws"
+  local live_dir="$home/.cursor/projects/$(slugify "$ws")/agent-transcripts/live111"
+  mkdir -p "$live_dir"
+  echo '{"role":"user","message":{"content":[{"type":"text","text":"<user_query>live session prompt</user_query>"}]}}' > "$live_dir/live111.jsonl"
+
+  HOME="$home" bash "$TOOLS" session-init live-sid >/dev/null
+  HOME="$home" bash "$TOOLS" prompt-tick live-sid "$live_dir/live111.jsonl" "a prompt with plenty of words here" >/dev/null
+
+  run bash -c "cd '$ws' && HOME='$home' bash '$TOOLS' check-triggers live-sid"
+  [ -z "$output" ]
+
+  local other_dir="$home/.cursor/projects/$(slugify "$ws")/agent-transcripts/other222"
+  mkdir -p "$other_dir"
+  echo '{"role":"user","message":{"content":[{"type":"text","text":"<user_query>a different session</user_query>"}]}}' > "$other_dir/other222.jsonl"
+
+  run bash -c "cd '$ws' && HOME='$home' bash '$TOOLS' check-triggers live-sid"
+  assert_contains "Habit maintenance available" "$output"
+  refute_contains "/habit:distill" "$output"
+}
+
 @test "prune-log bounds the log to LOG_RETAIN" {
   local d="$BATS_TEST_TMPDIR/pl"
   mkdir -p "$d"
