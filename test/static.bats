@@ -67,13 +67,14 @@ SKILL_NAMES="habit suggest edit watch distill"
   refute_contains 'override' "$(grep "log-exec '" "$SKILLS/suggest/SKILL.md")"
 }
 
-@test "watch has no learnings overlay but lists and forgets learnings" {
-  local body
+@test "watch has no learnings overlay but shows status, pauses, snoozes, and forgets learnings" {
+  local body c
   body=$(cat "$SKILLS/watch/SKILL.md")
   refute_contains "===LEARNINGS===" "$body"
   refute_contains "read-learnings" "$body"
-  assert_contains "list-learnings" "$body"
-  assert_contains "forget-learning" "$body"
+  for c in list-learnings forget-learning status "watch off" "watch on" "watch snooze"; do
+    assert_contains "habit-tools.sh $c" "$body"
+  done
 }
 
 @test "distill claims, finishes, undoes, writes learnings, and checks env-context" {
@@ -99,7 +100,7 @@ hook() { # hook <home> <cwd> <event> <payload>
   (cd "$2" && printf '%s' "$4" | env -u CLAUDE_PLUGIN_ROOT -u CURSOR_PLUGIN_ROOT HOME="$1" bash "$HOOK" "$3")
 }
 
-@test "fitness 2: hooks change only the inbox, the shim, and first-run migration outputs" {
+@test "fitness 2: hooks change only the inbox, the shim, nudge.next, and first-run migration outputs" {
   local h g repo before after changed
   h=$(new_home fit2)
   g="$h/.claude/habits"
@@ -119,7 +120,7 @@ hook() { # hook <home> <cwd> <event> <payload>
   after=$(tree_state "$h")
   changed=$(LC_ALL=C comm -3 <(echo "$before") <(echo "$after") | awk '{print $1}' | sort -u)
   [ -n "$changed" ]
-  run bash -c "echo '$changed' | grep -vE '^\./\.claude/habits/(bin|inbox|log|snapshots)(/|$)|^\./\.claude/habits/(\.v3|learnings\.jsonl|migrated-projects|backfill-skipped)$'"
+  run bash -c "echo '$changed' | grep -vE '^\./\.claude/habits/(bin|inbox|log|snapshots)(/|$)|^\./\.claude/habits/(\.v3|nudge\.next|learnings\.jsonl|migrated-projects|backfill-skipped)$'"
   [ -z "$output" ]
   [ -x "$g/bin/habit-tools.sh" ] && [ -f "$g/.v3" ]
 
@@ -130,6 +131,12 @@ hook() { # hook <home> <cwd> <event> <payload>
   hook "$h" "$repo" capture '{"session_id":"s2","cwd":"/w","prompt":"a captured prompt goes here"}'
   changed=$(LC_ALL=C comm -3 <(echo "$before") <(tree_state "$h") | awk '{print $1}' | sort -u)
   [ "$changed" = "./.claude/habits/inbox/claude-s2.jsonl" ]
+
+  seed_inbox "$g/inbox/claude-s2.jsonl" 300 0
+  before=$(tree_state "$h")
+  [ -n "$(hook "$h" "$repo" pre-compact '{"cursor_version":"3.25"}')" ]
+  changed=$(LC_ALL=C comm -3 <(echo "$before") <(tree_state "$h") | awk '{print $1}' | sort -u)
+  [ "$changed" = "./.claude/habits/nudge.next" ]
 }
 
 # --- Fitness 3 and 4: write ownership ---
@@ -178,7 +185,7 @@ named_cmds() {
     case " $allow " in *" $c "*) ;; *) bad="$bad unnamed:$c" ;; esac
   done
   [ -z "$bad" ]
-  grep -q 'session-start|capture)' "$HOOK"
+  grep -q 'session-start|capture|pre-compact)' "$HOOK"
 }
 
 # --- Fitness 6: manifests ---

@@ -20,7 +20,13 @@ All habit data goes through the habit CLI. Invoke every command as `bash ~/.clau
 
 - **Write a learning:** `write-learning <target> '<rule>' '<origin>'`, with target `habit`, `suggest`, `edit`, `distill`, or `global`.
 - **List learnings:** `list-learnings` (numbered).
-- **Forget a learning:** `forget-learning <n>`.
+- **Forget a learning:** `forget-learning <n>`, or `watch forget <n>`.
+
+## Monitoring
+
+- **Status:** `status` (same as `watch`). Prints the health report: version, installed copies, capture, backlog, whether distill is due, habit counts, rule budget, learnings, and integrity checks. It exits non-zero when an integrity check fails.
+- **Pause capture:** `watch off [hours]` (8 hours by default). `watch on` resumes it.
+- **Snooze the distill reminder:** `watch snooze [days]` (7 days by default).
 
 ## Environment
 

@@ -90,3 +90,17 @@ archived: $6
 $7
 EOF
 }
+
+# seed_inbox <file> <lines> <age days> [projects]: prompt lines stamped <age>
+# days ago, with cwd cycling over [projects] distinct dirs. Appends.
+seed_inbox() {
+  mkdir -p "$(dirname "$1")"
+  jq -nc --argjson n "$2" --argjson d "$3" --argjson p "${4:-1}" 'range($n) as $i
+    | {ts: (now - $d * 86400 | floor | todate), host: "claude", sid: "s", cwd: "/p\($i % $p)", prompt: "a prompt numbered \($i)"}' >> "$1"
+}
+
+# Write a shim at <home> pointing at this checkout, as session-start would.
+seed_shim() {
+  mkdir -p "$1/.claude/habits/bin"
+  printf '#!/bin/bash\n# habit-shim 9.9.9\nexec bash "%s" "$@"\n' "$TOOLS" > "$1/.claude/habits/bin/habit-tools.sh"
+}

@@ -1,4 +1,4 @@
-# shim.sh: SessionStart hook: the fixed CLI path, then migrate-if-needed.
+# shim.sh: SessionStart hook: the fixed CLI path, migrate-if-needed, the nudge.
 
 # Exit 0 when version $1 is malformed or not newer than $2 (X.Y.Z, numeric).
 _version_le() {
@@ -34,8 +34,13 @@ write_shim() {
   return 1
 }
 
+# stdout is the host's hook output: only the nudge JSON may reach it. Cursor
+# gets its notice from preCompact instead.
 cmd_session_start() {
-  [ -t 0 ] || cat >/dev/null 2>&1 || true
-  write_shim || true
-  migrate_if_needed bg || true
+  local input=""
+  [ -t 0 ] || input=$(cat 2>/dev/null) || input=""
+  write_shim >/dev/null 2>&1 || true
+  migrate_if_needed bg >/dev/null 2>&1 || true
+  case "$input" in *'"cursor_version"'*) return 0 ;; esac
+  nudge_session_start || true
 }

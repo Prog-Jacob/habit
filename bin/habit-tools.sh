@@ -25,6 +25,15 @@ _migrate_libs() {
   source "$SCRIPT_DIR/lib/snapshot.sh"
 }
 
+_status_libs() {
+  _habit_libs
+  source "$SCRIPT_DIR/lib/snapshot.sh"
+  source "$SCRIPT_DIR/lib/learnings.sh"
+  source "$SCRIPT_DIR/lib/nudge.sh"
+  source "$SCRIPT_DIR/lib/watch.sh"
+  source "$SCRIPT_DIR/lib/status.sh"
+}
+
 cmd="${1:-}"; shift || true
 
 case "$cmd" in
@@ -34,7 +43,10 @@ case "$cmd" in
     source "$SCRIPT_DIR/lib/capture.sh" ;;
   session-start)
     _migrate_libs
-    source "$SCRIPT_DIR/lib/shim.sh" ;;
+    source "$SCRIPT_DIR/lib/shim.sh"
+    source "$SCRIPT_DIR/lib/nudge.sh" ;;
+  pre-compact)
+    source "$SCRIPT_DIR/lib/nudge.sh" ;;
   migrate)
     _migrate_libs ;;
   claim|finish|undo)
@@ -42,12 +54,10 @@ case "$cmd" in
     source "$SCRIPT_DIR/lib/inbox.sh" ;;
   write-learning|read-learnings|list-learnings|forget-learning)
     source "$SCRIPT_DIR/lib/learnings.sh" ;;
-  watch)
-    source "$SCRIPT_DIR/lib/watch.sh" ;;
+  status|watch)
+    _status_libs ;;
   preload)
-    _habit_libs
-    source "$SCRIPT_DIR/lib/learnings.sh"
-    source "$SCRIPT_DIR/lib/watch.sh"
+    _status_libs
     source "$SCRIPT_DIR/lib/preload.sh" ;;
   env-context)
     cmd_env_context() {
@@ -62,15 +72,16 @@ case "$cmd" in
     ;;
   *)
     echo "Usage: habit-tools.sh <command> [args]" >&2
-    echo "Commands: preload, read-index, invalid-habits, read-habit, write-habit, delete-habit, log-exec, read-log, write-learning, read-learnings, list-learnings, forget-learning, watch, claim, finish, undo, capture, session-start, migrate, env-context" >&2
+    echo "Commands: preload, read-index, invalid-habits, read-habit, write-habit, delete-habit, log-exec, read-log, write-learning, read-learnings, list-learnings, forget-learning, status, watch, claim, finish, undo, capture, session-start, pre-compact, migrate, env-context" >&2
     exit 1
     ;;
 esac
 
 # Lazy migration: hooks and pure lookups skip it; everything else migrates
 # first when .v3 is missing or the current project still has a v2 log.
+# status only observes, so it reports a missing .v3 instead of fixing it.
 case "$cmd" in
-  capture|session-start|migrate|env-context) ;;
+  capture|session-start|pre-compact|status|migrate|env-context) ;;
   *)
     if [ ! -f "$GLOBAL_DIR/.v3" ] || _migrate_project_pending >/dev/null; then
       _migrate_libs

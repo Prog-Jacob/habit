@@ -2,6 +2,7 @@
   "version": 1,
   "hooks": {
     "sessionStart": [{ "command": "./hooks/habit-hook.sh session-start" }],
-    "beforeSubmitPrompt": [{ "command": "./hooks/habit-hook.sh capture" }]
+    "beforeSubmitPrompt": [{ "command": "./hooks/habit-hook.sh capture" }],
+    "preCompact": [{ "command": "./hooks/habit-hook.sh pre-compact" }]
   }
 }

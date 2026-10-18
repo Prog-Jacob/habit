@@ -89,14 +89,15 @@ Pick by number or name. Add context to narrow a run (e.g., `1 only in auth`). Wh
 | `/habit:distill`                 | Turn captured prompts from every project into habits. Classifies, deduplicates, writes or merges habits.       |
 | `/habit:distill maintain`        | Regular sweep plus full inventory restructure: merge convergent habits, normalize tags, archive stale entries. |
 | `/habit:distill undo`            | Undo the last distill run and queue its prompts again.                                                         |
-| `/habit:watch`                   | Show capture status, prompts waiting for distill, and the last capture.                                        |
+| `/habit:watch`                   | Show status: installed copies, capture per host, the backlog, whether distill is due, learnings, integrity.    |
 | `/habit:watch off [hours]`       | Pause capture on every session for 8 hours, or the given hours. `/habit:watch on` resumes it.                  |
+| `/habit:watch snooze [days]`     | Silence the daily distill reminder for 7 days, or the given days.                                              |
 
 ---
 
 ## How It Works
 
-**Hooks.** Each prompt you type is copied into a local inbox in `~/.claude/habits/inbox/`, from every project and both hosts. Short replies keep a snippet of the assistant message they answered, and common secret patterns are redacted. `SessionStart` keeps a fixed CLI path at `~/.claude/habits/bin/habit-tools.sh` up to date.
+**Hooks.** Each prompt you type is copied into a local inbox in `~/.claude/habits/inbox/`, from every project and both hosts. Short replies keep a snippet of the assistant message they answered, and common secret patterns are redacted. `SessionStart` keeps a fixed CLI path at `~/.claude/habits/bin/habit-tools.sh` up to date. When at least 30 prompts wait and the oldest is a week old (or 300 wait), a new session shows one reminder a day to run `/habit:distill` (Cursor shows it before compacting the context).
 
 **Distill** runs in a forked subagent. It claims the inbox, groups the prompts by project, classifies each one as reusable or one-off, deduplicates against existing habits, and writes new or merged entries. `maintain` adds a full restructure pass: merging convergent habits, normalizing tags, and archiving stale entries. Every run takes a snapshot first, so `/habit:distill undo` restores the habits and queues the prompts again.
 

@@ -23,7 +23,7 @@ cmd_preload() {
       _section LEARNINGS cmd_read_learnings edit
       _section PROCESSING _shared_doc PROCESSING.md
       ;;
-    watch) ( cmd_watch status ) 2>&1 || true ;;
+    watch) ( cmd_status ) 2>&1 || true ;;
     distill)
       _section LEARNINGS cmd_read_learnings distill
       _section INDEX cmd_read_index merged
