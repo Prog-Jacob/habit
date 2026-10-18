@@ -1,9 +1,20 @@
 #!/usr/bin/env bats
 # Hook adapter: session-start, capture and pre-compact route to the CLI.
-# Retired v2 events from a stale host config are silent no-ops. Also the
-# distill due rule and its throttled notices.
+# Retired v2 events from a stale host config are silent no-ops. Also paths
+# with spaces, a missing jq, and the distill due rule and its notices.
 
 load test_helper
+
+# A PATH dir holding every system tool except jq.
+setup_file() {
+  export NOJQ="$BATS_FILE_TMPDIR/nojq"
+  mkdir -p "$NOJQ"
+  local f
+  for f in /bin/* /usr/bin/*; do
+    if [ -x "$f" ] && [ "${f##*/}" != jq ]; then ln -sf "$f" "$NOJQ/"; fi
+  done
+  ln -sf "$(command -v bash)" "$NOJQ/bash"
+}
 
 @test "retired and unknown hook events exit 0, print nothing, and write nothing" {
   local h ev
@@ -29,12 +40,58 @@ load test_helper
   run jq -r '.hooks | keys | join(",")' "$REPO_ROOT/hooks/hooks.json"
   [ "$output" = "SessionStart,UserPromptSubmit" ]
   run jq -r '.hooks.SessionStart[0].hooks[0] | [.command, (.async // false | tostring)] | join("|")' "$REPO_ROOT/hooks/hooks.json"
-  [ "$output" = 'bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh session-start|false' ]
+  [ "$output" = 'bash "${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh" session-start|false' ]
   run jq -r '.hooks.UserPromptSubmit[0].hooks[0] | [.command, (.async | tostring)] | join("|")' "$REPO_ROOT/hooks/hooks.json"
-  [ "$output" = 'bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh capture|true' ]
+  [ "$output" = 'bash "${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh" capture|true' ]
   run jq -r '.hooks | to_entries | map("\(.key)=\(.value[0].command)") | join(",")' "$REPO_ROOT/hooks/hooks.cursor.json"
   [ "$output" = "sessionStart=./hooks/habit-hook.sh session-start,beforeSubmitPrompt=./hooks/habit-hook.sh capture,preCompact=./hooks/habit-hook.sh pre-compact" ]
   [ -x "$HOOK" ]
+}
+
+# host <home> <plugin root> <event> <payload>: run that hooks.json command
+# string through bash, as Claude Code does.
+host() {
+  local cmd
+  cmd=$(jq -r ".hooks.$3[0].hooks[0].command" "$2/hooks/hooks.json")
+  (cd "$1" && printf '%s' "$4" | env -u CURSOR_PLUGIN_ROOT HOME="$1" CLAUDE_PLUGIN_ROOT="$2" bash -c "$cmd")
+}
+
+@test "hooks, migration and the shim work when the plugin root and HOME contain spaces" {
+  local root="$BATS_TEST_TMPDIR/plugin root" h="$BATS_TEST_TMPDIR/my home" g i
+  g="$h/.claude/habits"
+  mkdir -p "$root" "$g"
+  cp -R "$REPO_ROOT/bin" "$REPO_ROOT/hooks" "$REPO_ROOT/skills" "$REPO_ROOT/.claude-plugin" "$root/"
+  printf -- '---\nid: r1\ndescription: A rule.\nkind: rule\n---\nRule one.\n' > "$g/r1.md"
+  jq -nc '{display: "a prompt to backfill here", timestamp: ((now - 60) * 1000 | floor), project: "/w", sessionId: "b1"}' > "$h/.claude/history.jsonl"
+  run host "$h" "$root" SessionStart '{"session_id":"s1","source":"startup"}'
+  [ "$status" -eq 0 ]
+  assert_contains "### r1" "$(jq -r .hookSpecificOutput.additionalContext <<< "$output")"
+  [ "$(sed -n 's/^exec bash "\(.*\)" "\$@"$/\1/p' "$g/bin/habit-tools.sh")" = "$(cd "$root" && pwd -P)/bin/habit-tools.sh" ]
+  [ -f "$g/.v3" ]
+  for i in $(seq 1 50); do [ -s "$g/inbox/claude-backfill-00.jsonl" ] && break; sleep 0.1; done
+  [ "$(jq -r .prompt "$g/inbox/claude-backfill-00.jsonl")" = "a prompt to backfill here" ]
+  run host "$h" "$root" UserPromptSubmit '{"session_id":"s2","cwd":"/w","prompt":"a prompt captured with spaces"}'
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .prompt "$g/inbox/claude-s2.jsonl")" = "a prompt captured with spaces" ]
+  run bash -c 'cd "$1" && HOME="$1" bash "$1/.claude/habits/bin/habit-tools.sh" preload suggest' _ "$h"
+  [ "$status" -eq 0 ]
+  assert_contains '"r1"' "$output"
+}
+
+@test "without jq, session-start writes the shim and asks for jq once, and the CLI fails with the same advice" {
+  local h g advice
+  h=$(new_home nojq); g="$h/.claude/habits"
+  advice="habit needs jq. Install it (macOS: brew install jq, Debian or Ubuntu: sudo apt install jq), then start a new session."
+  nj() { (cd "$h" && printf '%s' "$1" | env -i HOME="$h" PATH="$NOJQ" "$NOJQ/bash" "$HOOK" session-start); }
+  run nj '{"session_id":"s1","source":"startup"}'
+  [ "$status" -eq 0 ]
+  [ "$output" = "{\"systemMessage\":\"$advice\"}" ]
+  [ -f "$g/bin/habit-tools.sh" ] && [ ! -e "$g/.v3" ]
+  run nj '{"conversation_id":"c1","cursor_version":"3.25"}'
+  [ "$status" -eq 0 ] && [ -z "$output" ]
+  run bash -c 'cd "$1" && env -i HOME="$1" PATH="$2" "$2/bash" "$1/.claude/habits/bin/habit-tools.sh" preload suggest 2>&1 >/dev/null' _ "$h" "$NOJQ"
+  [ "$status" -eq 1 ]
+  [ "$output" = "$advice" ]
 }
 
 # --- due rule and notices ---

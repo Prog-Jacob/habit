@@ -152,6 +152,7 @@ new_md() { printf -- '---\nid: %s\ndescription: %s\n---\n\n%s\n' "$1" "$2" "$3";
   [ ! -f "$G/learnings.jsonl" ]
   [ -d "$G/inbox/.claimed/$run" ]
   [ ! -d "$G/inbox/.done/$run" ]
+  [ -f "$G/snapshots/undone-$run.tar.gz" ] && [ ! -f "$G/snapshots/$run.tar.gz" ]
 
   local undo_run
   undo_run=$(ls "$G/snapshots" | sed -n 's/^\(undo-.*\)\.tar\.gz$/\1/p' | tail -n 1)
@@ -164,6 +165,23 @@ new_md() { printf -- '---\nid: %s\ndescription: %s\n---\n\n%s\n' "$1" "$2" "$3";
   assert_contains "a learning from the run" "$(cat "$G/learnings.jsonl")"
   [ -d "$G/inbox/.done/$run" ]
   [ ! -d "$G/inbox/.claimed/$run" ]
+  [ -f "$G/snapshots/$run.tar.gz" ] && [ ! -f "$G/snapshots/undone-$run.tar.gz" ]
+}
+
+@test "repeated undo steps back one run at a time, then says nothing is left" {
+  local r1 r2
+  r1=$(hx "$H" "$H" snapshot | sed -n 's/^RUN //p')
+  hx "$H" "$H" write-habit global keep "$(new_md keep 'Kept habit.' 'First run.')" >/dev/null
+  r2=$(hx "$H" "$H" snapshot | sed -n 's/^RUN //p')
+  hx "$H" "$H" write-habit global keep "$(new_md keep 'Kept habit.' 'Second run.')" >/dev/null
+  run hx "$H" "$H" undo
+  assert_contains "UNDO $r2" "$output"
+  assert_contains "First run." "$(cat "$G/keep.md")"
+  run hx "$H" "$H" undo
+  assert_contains "UNDO $r1" "$output"
+  assert_contains "Original body." "$(cat "$G/keep.md")"
+  run hx "$H" "$H" undo
+  [ "$output" = "Nothing to undo" ]
 }
 
 @test "undo with no distill run says so and changes nothing" {
@@ -175,11 +193,10 @@ new_md() { printf -- '---\nid: %s\ndescription: %s\n---\n\n%s\n' "$1" "$2" "$3";
 @test "snapshot on an empty inbox makes a distill run that undo restores" {
   run hx "$H" "$REPO/src" claim
   [ "$output" = "EMPTY" ]
-  run hx "$H" "$REPO/src" snapshot maintain
+  run hx "$H" "$REPO/src" snapshot
   local run
   run=$(echo "$output" | sed -n 's/^RUN //p')
   [[ "$run" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]
-  [ "$(tar -xzOf "$G/snapshots/$run.tar.gz" ./LABEL)" = maintain ]
   assert_contains "$REPO/.claude/habits/proj.md" "$(tar -xzOf "$G/snapshots/$run.tar.gz" ./MANIFEST)"
   hx "$H" "$H" write-habit global keep "$(new_md keep 'Kept habit.' 'Rewritten as a rule.')" >/dev/null
   hx "$H" "$H" write-habit global added "$(new_md added 'Added by maintain.' 'New.')" >/dev/null

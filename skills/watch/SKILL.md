@@ -27,7 +27,7 @@ The output is the status report: the running version and installed copies, v2 le
 1. Pause intent (off, stop, pause, disable), with optional hours: run `bash ~/.claude/habits/bin/habit-tools.sh watch off [hours]` (8 hours when none are given). Confirm when capture resumes on its own.
 2. Resume intent (on, start, resume): run `bash ~/.claude/habits/bin/habit-tools.sh watch on`. Confirm "Capture resumed."
 3. Snooze intent (snooze, stop reminding, quiet the distill reminder), with optional days: run `bash ~/.claude/habits/bin/habit-tools.sh watch snooze [days]` (7 days when none are given). Confirm the date the reminder returns.
-4. Forget intent with a number: run `bash ~/.claude/habits/bin/habit-tools.sh forget-learning <n>`, then run `bash ~/.claude/habits/bin/habit-tools.sh list-learnings` and show the new list.
+4. Forget intent with a number: run `bash ~/.claude/habits/bin/habit-tools.sh watch forget <n>`, then run `bash ~/.claude/habits/bin/habit-tools.sh list-learnings` and show the new list.
 5. Learnings intent (learnings, what have you learned): show the numbered learnings from the report as is, or say there are none. Mention that "forget <n>" removes one.
 6. A fresh check later in the conversation: run `bash ~/.claude/habits/bin/habit-tools.sh status`.
 7. Otherwise, summarize the report in a few plain lines: capture state, the backlog, and whether distill is due. Repeat every `WARN:` and `FAIL:` line with its fix. If distill is due, mention that the distill habit turns the prompts into habits.

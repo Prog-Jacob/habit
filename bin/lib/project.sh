@@ -2,13 +2,12 @@
 
 # Physical path of $1, or of its nearest existing ancestor.
 _existing_dir() {
-  local p="$1"
-  while [ -n "$p" ]; do
-    (cd "$p" 2>/dev/null && pwd -P) && return 0
-    [ "$p" = "/" ] && return 1
-    p=$(dirname "$p")
+  local p="$1" up
+  until (cd "$p" 2>/dev/null && pwd -P); do
+    up=$(dirname "$p")
+    [ "$up" != "$p" ] || return 1
+    p="$up"
   done
-  return 1
 }
 
 # Nearest ancestor of [start] holding .claude/habits, stopping before $HOME.

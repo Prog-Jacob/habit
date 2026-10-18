@@ -15,15 +15,15 @@ def body_text: gsub("\u001d"; "\n") | gsub("^\\s+|\\s+$"; "")
 | "These are the user'"'"'s standing rules from habit. Follow them in this session." as $head
 | "Procedures (load with read-habit <id> when relevant): " as $pre
 | (if $uncl > 0 then "\($uncl) unclassified habit\(if $uncl == 1 then "" else "s" end): run /habit:distill maintain." else "" end) as $ul
-| ($head | line_len) + (if $due != "" then $due | line_len else 0 end)
-  + (if $ul != "" then $ul | line_len else 0 end)
-  + ("INJECTED: " | line_len) + ("Rules not loaded (budget): " | line_len)
-  + ($rules | map(.id | length + 2) | add // 0)
-  + (if ($procs | length) > 0 then ($pre | length) + 13 else 0 end) as $fixed
-| ($rules | map(select(.scope == "project")) + map(select(.scope == "global")))
-| reduce .[] as $r ({used: 0, ids: {}};
-    if .used + ($r.text | line_len) <= $budget - $fixed
-    then .used += ($r.text | line_len) | .ids[$r.id] = true else . end) as $pick
+| (($head | line_len) + (if $due != "" then $due | line_len else 0 end)
+   + (if $ul != "" then $ul | line_len else 0 end)
+   + ("INJECTED: " | line_len) + ("Rules not loaded (budget): " | line_len)
+   + ($rules | map(.id | length + 2) | add // 0)
+   + (if ($procs | length) > 0 then ($pre | length) + 13 else 0 end)) as $fixed
+| ($rules | map(select(.scope == "project")) + map(select(.scope == "global"))
+   | reduce .[] as $r ({used: 0, ids: {}};
+       if .used + ($r.text | line_len) <= $budget - $fixed
+       then .used += ($r.text | line_len) | .ids[$r.id] = true else . end)) as $pick
 | ($rules | map(select($pick.ids[.id]))) as $in
 | ($rules | map(select($pick.ids[.id] | not) | .id)) as $out
 | ([$head] + ($in | map(select(.scope == "global") | .text)) + ($in | map(select(.scope == "project") | .text))

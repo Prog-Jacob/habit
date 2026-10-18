@@ -4,17 +4,6 @@
 # Epoch mtime of a file (GNU stat, then BSD stat).
 _mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null; }
 
-_shim_target() {
-  [ -f "$GLOBAL_DIR/bin/habit-tools.sh" ] || return 0
-  sed -n 's/^exec bash "\(.*\)" "\$@"$/\1/p' "$GLOBAL_DIR/bin/habit-tools.sh" 2>/dev/null | head -n 1
-}
-
-_manifest_version() {
-  local m="$1/.claude-plugin/plugin.json"
-  [ -f "$m" ] || m="$1/.cursor-plugin/plugin.json"
-  jq -r '.version // "?"' "$m" 2>/dev/null || echo "?"
-}
-
 # Installed habit copies, one "<host>\t<name>\t<version>" line each. Claude
 # Code's install record is the source of truth: version dirs in its cache are
 # leftovers or folder-install snapshots, not separate installs.
@@ -27,7 +16,7 @@ _status_copies() {
   find "$HOME/.cursor" -maxdepth 7 \( -name node_modules -o -name extensions \) -prune \
       -o -path '*/.cursor-plugin/plugin.json' -print 2>/dev/null | while IFS= read -r f; do
     if [ "$(jq -r '.name // empty' "$f" 2>/dev/null)" = habit ]; then
-      printf 'cursor\t%s\t%s\n' "$(cd "$(dirname "$f")/.." && pwd -P)" "$(_manifest_version "$(dirname "$f")/..")"
+      printf 'cursor\t%s\t%s\n' "$(cd "$(dirname "$f")/.." && pwd -P)" "$(plugin_version "$(dirname "$f")/..")"
     fi
   done
 }
@@ -36,8 +25,8 @@ _status_copies() {
 _status_install() {
   local root target copies n host name version
   root=$(cd "$SCRIPT_DIR/.." && pwd -P)
-  echo "Version: $(_manifest_version "$root") running from $root"
-  target=$(_shim_target)
+  echo "Version: $(plugin_version "$root") running from $root"
+  target=$(shim_target "$GLOBAL_DIR/bin/habit-tools.sh")
   echo "Shim: ${target:-missing}"
   copies=$(_status_copies | sort -u)
   echo "Installed copies:"
@@ -67,21 +56,22 @@ _status_v2() {
 
 # Capture state, then the newest capture file per host (backfill excluded).
 _status_capture() {
-  local until host f newest files out=""
-  until=$(_paused_until) || until=""
-  if [ -n "$until" ]; then echo "Capture: PAUSED until $(_local_time "$until")"; else echo "Capture: ACTIVE"; fi
+  local until host f m newest out=""
+  if until=$(epoch_from "$GLOBAL_DIR/paused") && [ "$until" -gt "$(date +%s)" ]; then
+    echo "Capture: PAUSED until $(_local_time "$until")"
+  else
+    echo "Capture: ACTIVE"
+  fi
   for host in claude cursor; do
-    files=()
+    newest=0
     for f in "$GLOBAL_DIR"/inbox/"$host"-*.jsonl "$GLOBAL_DIR"/inbox/.claimed/*/"$host"-*.jsonl \
         "$GLOBAL_DIR"/inbox/.done/*/"$host"-*.jsonl; do
       case "$f" in *-backfill-*) continue ;; esac
-      if [ -f "$f" ]; then files+=("$f"); fi
+      [ -f "$f" ] || continue
+      m=$(_mtime "$f")
+      if [ "$m" -gt "$newest" ]; then newest=$m; fi
     done
-    newest="none"
-    if [ ${#files[@]} -gt 0 ]; then
-      f=$(ls -t "${files[@]}" | head -n 1)
-      newest=$(_local_time "$(_mtime "$f")")
-    fi
+    if [ "$newest" -gt 0 ]; then newest=$(_local_time "$newest"); else newest=none; fi
     out="$out${out:+, }$host $newest"
   done
   echo "Last capture: $out"
@@ -92,7 +82,7 @@ _status_backlog() {
   if due_check; then due="due"; fi
   if [ "${DUE_OLDEST:-0}" -gt 0 ]; then oldest=$(_local_time "$DUE_OLDEST" | cut -c1-10); fi
   echo "Backlog: ${DUE_BACKLOG:-0} prompts, oldest $oldest"
-  if next=$(nudge_next) && [ "$next" -gt "$(date +%s)" ]; then
+  if next=$(epoch_from "$GLOBAL_DIR/nudge.next") && [ "$next" -gt "$(date +%s)" ]; then
     due="$due (reminders snoozed until $(_local_time "$next"))"
   fi
   echo "Distill: $due"
@@ -100,27 +90,26 @@ _status_backlog() {
 
 _status_last_distill() {
   local run epoch
-  run=$(snapshot_runs | grep -v -e '^undo-' -e '^migrate-' | tail -n 1 || true)
+  run=$(snapshot_runs | grep -E '^[0-9]' | tail -n 1 || true)
   if [ -z "$run" ]; then echo "Last distill: never"; return 0; fi
   epoch=$(jq -rn --arg r "$run" '$r | strptime("%Y%m%dT%H%M%SZ") | mktime' 2>/dev/null) || epoch=""
   echo "Last distill: ${epoch:+$(_local_time "$epoch") }($run)"
 }
 
-# Habit counts over global and project files, and the rule budget.
+# Habit counts over global and project files, and the rule budget: the size of
+# the rules block a session in this project loads.
 _status_habits() {
-  local pdir rows p chars=0
+  local pdir
   pdir=$(project_dir) || pdir=""
-  rows=$(_index_rows "$pdir")
-  jq -nr --arg rows "$rows" "$INDEX_JQ_DEFS"'
+  jq -nr --rawfile rows <(_index_rows "$pdir") "$INDEX_JQ_DEFS"'
     [rows] as $all | ($all | map(select(valid))) as $v
     | ($v | map(select(.archived != "true"))) as $act
     | "Habits: \($act | length) active, \($v | length - ($act | length)) archived, "
       + "\($act | map(select(.kind == "")) | length) unclassified, \($all | length - ($v | length)) invalid"'
-  while IFS= read -r p; do
-    [ -n "$p" ] || continue
-    chars=$((chars + $(awk 'n >= 2 { print } /^---$/ { n++ }' "$p" | wc -m)))
-  done < <(jq -nr --arg rows "$rows" "$INDEX_JQ_DEFS"'rows | select(valid and .archived != "true" and .kind == "rule") | .path')
-  echo "Rule budget: $chars/$RULES_BUDGET chars"
+  rules_preload | jq -Rrs --argjson b "$RULES_BUDGET" '
+    ([split("\n")[] | select(startswith("Rules not loaded (budget): "))
+      | ltrimstr("Rules not loaded (budget): ") | split(", ")[]] | length) as $k
+    | "Rule budget: \(length)/\($b) chars" + (if $k > 0 then ", \($k) rules not loaded" else "" end)'
 }
 
 _status_learnings() {
@@ -142,7 +131,7 @@ _status_torn() {
 
 _status_integrity() {
   local fail=0 target bad
-  target=$(_shim_target)
+  target=$(shim_target "$GLOBAL_DIR/bin/habit-tools.sh")
   if [ -z "$target" ] || [ ! -f "$target" ]; then
     echo "FAIL: the shim target is missing. Start a new session to rewrite it."; fail=1
   fi

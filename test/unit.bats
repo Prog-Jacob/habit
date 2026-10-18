@@ -42,10 +42,9 @@ teardown() {
   [ "$output" = "global $TEST_GLOBAL/cleanup-writing.md" ]
 }
 
-@test "cmd_read_habit emits SCOPE and body for a single id" {
+@test "cmd_read_habit emits SCOPE and the file for a single id, with no header" {
   run cmd_read_habit cleanup-writing
-  assert_contains "SCOPE:global" "$output"
-  assert_contains "Fix dashes." "$output"
+  [ "$output" = "$(printf 'SCOPE:global\n%s' "$(cat "$TEST_GLOBAL/cleanup-writing.md")")" ]
 }
 
 @test "cmd_read_habit delimits and emits each of multiple ids" {
@@ -57,10 +56,10 @@ teardown() {
   assert_contains "Test well." "$output"
 }
 
-@test "cmd_read_habit reports NOT_FOUND alongside found ids" {
-  run cmd_read_habit cleanup-writing nonexistent
-  assert_contains "NOT_FOUND" "$output"
-  assert_contains "---HABIT:cleanup-writing---" "$output"
+@test "cmd_read_habit reports NOT_FOUND between found ids" {
+  run cmd_read_habit cleanup-writing nonexistent smart-tests
+  [ "$output" = "$(printf -- '---HABIT:cleanup-writing---\nSCOPE:global\n%s\n---HABIT:nonexistent---\nNOT_FOUND\n---HABIT:smart-tests---\nSCOPE:global\n%s' \
+    "$(cat "$TEST_GLOBAL/cleanup-writing.md")" "$(cat "$TEST_GLOBAL/smart-tests.md")")" ]
 }
 
 @test "cmd_read_habit with no args reports NOT_FOUND" {
@@ -146,17 +145,21 @@ MD
   assert_contains "Do the thing." "$output"
 
   local entry
-  entry=$(cmd_read_index global | jq -c '.entries[] | select(.id=="new-habit")')
+  entry=$(cmd_read_index merged | jq -c '.entries[] | select(.id=="new-habit")')
   assert_contains '"description":"A freshly written habit."' "$entry"
   assert_contains '"alpha"' "$entry"
   assert_contains '"beta"' "$entry"
   assert_contains '"archived":false' "$entry"
 }
 
-@test "cmd_write_habit rejects an invalid id" {
+@test "cmd_write_habit rejects an invalid id or an unknown scope" {
   run cmd_write_habit global "Bad ID" "anything"
   [ "$status" -ne 0 ]
   assert_contains "Invalid id" "$output"
+  run cmd_write_habit elsewhere fine-id "$(printf -- '---\nid: fine-id\ndescription: Fine.\n---\n')"
+  [ "$status" -ne 0 ]
+  assert_contains "Unknown scope: elsewhere" "$output"
+  [ ! -e "$TEST_GLOBAL/fine-id.md" ]
 }
 
 @test "cmd_write_habit rejects a frontmatter id mismatch and writes nothing" {

@@ -34,17 +34,10 @@ _capture_ctx() {
      | select(test("\\S"))] | last // empty | gsub("^\\s+|\\s+$"; "") | .[-1000:]' 2>/dev/null
 }
 
-_capture_paused() {
-  local until
-  until=$(cat "$GLOBAL_DIR/paused" 2>/dev/null) || return 1
-  case "$until" in ''|*[!0-9]*) return 1 ;; esac
-  [ "$until" -gt "$(date +%s)" ]
-}
-
 cmd_capture() {
-  local input meta sid host tp words ctx="" line
+  local input meta sid host tp words ctx="" line until
   input=$(cat) || return 0
-  _capture_paused && return 0
+  until=$(epoch_from "$GLOBAL_DIR/paused") && [ "$until" -gt "$(date +%s)" ] && return 0
   meta=$(printf '%s' "$input" | jq -r "$CAPTURE_JQ_DEFS"'
     [((.session_id // .conversation_id // "") | tostring | gsub("[^A-Za-z0-9_-]"; "")),
      (if has("cursor_version") then "cursor" else "claude" end),

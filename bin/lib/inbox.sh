@@ -15,6 +15,7 @@ _claim_candidates() {
   for f in "$GLOBAL_DIR"/inbox/.claimed/*/*.jsonl; do
     if [ -f "$f" ]; then echo "$f"; fi
   done
+  # shellcheck disable=SC2012  # capture names hold only [A-Za-z0-9_.-]
   (cd "$GLOBAL_DIR/inbox" 2>/dev/null && ls -tr -- *.jsonl 2>/dev/null) | while IFS= read -r f; do
     echo "$GLOBAL_DIR/inbox/$f"
   done
@@ -53,7 +54,7 @@ cmd_claim() {
   while IFS= read -r root; do
     dirs+=("$root/.claude/habits")
   done < <(printf '%s' "$map" | jq -r '[.[] | select(. != "")] | unique | .[]')
-  snapshot_create "$run" "${dirs[@]}"
+  snapshot_create "$run" "" "${dirs[@]}"
   echo "RUN $run"
   while IFS= read -r f; do
     case "$f" in "$dest"/*) ;; *) left=$((left + $(wc -l < "$f"))) ;; esac
@@ -88,28 +89,36 @@ cmd_finish() {
   echo "OK finished $run"
 }
 
-# undo [run]: restore the newest distill run's snapshot (or <run>), after
-# snapshotting the current state so the undo itself can be undone.
+# undo [run]: restore the newest distill run that still stands (or <run>),
+# after snapshotting the current state so the undo can itself be undone. The
+# restored run's snapshot becomes undone-<run>, so the next undo steps back.
 cmd_undo() {
-  local run="${1:-}" inbox="$GLOBAL_DIR/inbox" stage d undid
-  [ -n "$run" ] || run=$(snapshot_runs | grep -v -e '^undo-' -e '^migrate-' | tail -n 1 || true)
+  local run="${1:-}" snaps="$GLOBAL_DIR/$SNAP_DIR_NAME" inbox="$GLOBAL_DIR/inbox" stage d undid
+  [ -n "$run" ] || run=$(snapshot_runs | grep -E '^[0-9]' | tail -n 1 || true)
   [ -n "$run" ] || { echo "Nothing to undo"; return 0; }
-  [ -f "$GLOBAL_DIR/snapshots/$run.tar.gz" ] || { echo "No snapshot: $run" >&2; exit 1; }
+  [ -f "$snaps/$run.tar.gz" ] || { echo "No snapshot: $run" >&2; exit 1; }
   stage=$(snapshot_extract "$run") || { echo "Cannot read snapshot: $run" >&2; exit 1; }
-  local dirs=("$GLOBAL_DIR") SNAP_UNDID=""
+  local dirs=("$GLOBAL_DIR")
   while IFS= read -r d; do dirs+=("$d"); done < "$stage/DIRS"
-  [ -d "$inbox/.done/$run" ] && SNAP_UNDID="$run"
-  snapshot_create "$(new_run_id undo-)" "${dirs[@]}"
+  snapshot_create "undo-$(new_run_id)" "$run" "${dirs[@]}"
   echo "UNDO $run"
   snapshot_restore "$stage"
-  if [ -n "$SNAP_UNDID" ]; then
-    mkdir -p "$inbox/.claimed"
-    mv "$inbox/.done/$run" "$inbox/.claimed/$run" && echo "requeued $inbox/.claimed/$run"
-  fi
-  undid=$(cat "$stage/UNDID" 2>/dev/null || true)
-  if [ -n "$undid" ] && [ -d "$inbox/.claimed/$undid" ]; then
-    mkdir -p "$inbox/.done"
-    mv "$inbox/.claimed/$undid" "$inbox/.done/$undid" && echo "finished $inbox/.done/$undid"
-  fi
+  case "$run" in
+    undo-*) # Undoing an undo puts back the run it had undone.
+      undid=$(cat "$stage/UNDID" 2>/dev/null || true)
+      if [ -n "$undid" ] && [ -f "$snaps/undone-$undid.tar.gz" ]; then
+        mv "$snaps/undone-$undid.tar.gz" "$snaps/$undid.tar.gz"
+      fi
+      if [ -n "$undid" ] && [ -d "$inbox/.claimed/$undid" ]; then
+        mkdir -p "$inbox/.done"
+        mv "$inbox/.claimed/$undid" "$inbox/.done/$undid" && echo "finished $inbox/.done/$undid"
+      fi ;;
+    *)
+      mv "$snaps/$run.tar.gz" "$snaps/undone-$run.tar.gz"
+      if [ -d "$inbox/.done/$run" ]; then
+        mkdir -p "$inbox/.claimed"
+        mv "$inbox/.done/$run" "$inbox/.claimed/$run" && echo "requeued $inbox/.claimed/$run"
+      fi ;;
+  esac
   rm -rf "$stage"
 }

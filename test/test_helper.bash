@@ -30,7 +30,6 @@ refute_contains() {
 # scope resolves through HABIT_PROJECT_DIR (set by seed_fixtures).
 source_libs() {
   source "$REPO_ROOT/bin/lib/common.sh"
-  source "$REPO_ROOT/bin/lib/frontmatter.sh"
   GLOBAL_DIR="$TEST_GLOBAL"
   source "$REPO_ROOT/bin/lib/project.sh"
   source "$REPO_ROOT/bin/lib/usage-log.sh"

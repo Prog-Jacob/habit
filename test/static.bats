@@ -72,7 +72,7 @@ SKILL_NAMES="habit suggest edit watch distill"
   body=$(cat "$SKILLS/watch/SKILL.md")
   refute_contains "===LEARNINGS===" "$body"
   refute_contains "read-learnings" "$body"
-  for c in list-learnings forget-learning status "watch off" "watch on" "watch snooze"; do
+  for c in list-learnings "watch forget" status "watch off" "watch on" "watch snooze"; do
     assert_contains "habit-tools.sh $c" "$body"
   done
 }
@@ -80,7 +80,7 @@ SKILL_NAMES="habit suggest edit watch distill"
 @test "distill claims, finishes, undoes, snapshots, reads context files, writes learnings, and checks env-context" {
   local body
   body=$(cat "$SKILLS/distill/SKILL.md")
-  for c in claim finish undo "snapshot maintain" context-files write-learning env-context "write-habit project"; do
+  for c in claim finish undo snapshot context-files write-learning env-context "write-habit project"; do
     assert_contains "habit-tools.sh $c" "$body"
   done
   assert_contains "HABIT_PROJECT_DIR=<dir> bash ~/.claude/habits/bin/habit-tools.sh write-habit project" "$body"
@@ -135,7 +135,7 @@ hook() { # hook <home> <cwd> <event> <payload>
   after=$(tree_state "$h")
   changed=$(LC_ALL=C comm -3 <(echo "$before") <(echo "$after") | awk '{print $1}' | sort -u)
   [ -n "$changed" ]
-  run bash -c "echo '$changed' | grep -vE '^\./\.claude/habits/(bin|inbox|log|snapshots)(/|$)|^\./\.claude/habits/(\.v3|nudge\.next|learnings\.jsonl|migrated-projects|backfill-skipped)$'"
+  run bash -c "echo '$changed' | grep -vE '^\./\.claude/habits/(bin|inbox)(/|$)|^\./\.claude/habits/(\.v3|nudge\.next|learnings\.jsonl)$'"
   [ -z "$output" ]
   [ -x "$g/bin/habit-tools.sh" ] && [ -f "$g/.v3" ]
 
@@ -174,16 +174,15 @@ hook() { # hook <home> <cwd> <event> <payload>
 
 # --- Fitness 5: command coverage ---
 
+# Every cmd_* function the libs define is a CLI command.
 dispatcher_cmds() {
-  awk '/^case "\$cmd" in/ { n++; f = (n == 1); next }
-       f && /^esac/ { exit }
-       f && /^  [a-z][a-z|-]*\)/ { sub(/\).*/, ""); gsub(/ /, ""); k = split($0, a, "|"); for (i = 1; i <= k; i++) print a[i] }' \
-    "$REPO_ROOT/bin/habit-tools.sh" | sort -u
+  bash -c 'for f in "$1"/bin/lib/*.sh; do . "$f"; done; declare -F' _ "$REPO_ROOT" \
+    | sed -n 's/^declare -f cmd_//p' | tr _ - | sort -u
 }
 
 named_cmds() {
   { grep -rhoE 'habit-tools\.sh [a-z][a-z-]*' "$SKILLS" "$REPO_ROOT/rules"
-    grep -rhoE 'habit-hook\.sh [a-z][a-z-]*' "$REPO_ROOT"/hooks/*.json; } | awk '{print $2}' | sort -u
+    grep -rhoE 'habit-hook\.sh"? [a-z][a-z-]*' "$REPO_ROOT"/hooks/*.json; } | awk '{print $2}' | sort -u
 }
 
 @test "fitness 5: skills and hooks name only real commands, and every command is named" {

@@ -99,6 +99,16 @@ kind_md() {
   [ ! -f "$G/odd-kind.md" ]
 }
 
+@test "write-habit validates CRLF content as it validates LF" {
+  crlf() { kind_md "$@" | awk '{ printf "%s\r\n", $0 }'; }
+  run hx "$H" "$H" write-habit global crlf-rule "$(crlf crlf-rule rule 600)"
+  assert_contains "OK wrote" "$output"
+  [ "$(hx "$H" "$H" read-index merged | jq -r '.entries[] | select(.id=="crlf-rule") | .kind')" = rule ]
+  run hx "$H" "$H" write-habit global crlf-long "$(crlf crlf-long rule 601)"
+  [ "$status" -ne 0 ]
+  assert_contains "Rule crlf-long body is 601 characters" "$output"
+}
+
 @test "read-index active carries kind when the frontmatter has it" {
   hab "$G/a-rule.md" a-rule rule "Rule."
   hab "$G/a-proc.md" a-proc "" "Steps."
@@ -158,11 +168,11 @@ ssj() { # ssj <payload>: the session-start hook run from $H
 
 # --- context files ---
 
-@test "context-files caps each file, derives the memory slug, and skips missing files" {
+@test "context-files caps each file, derives the memory slug per character, and skips missing files" {
   local root slug out
-  root="$(cd "$H" && pwd -P)/my.repo"
+  root="$(cd "$H" && pwd -P)/my.répo"
   mkdir -p "$root/.claude/habits" "$root/sub"
-  slug=$(printf '%s' "$root" | sed 's/[^A-Za-z0-9]/-/g')
+  slug="$(cd "$H" && pwd -P | sed 's/[^A-Za-z0-9]/-/g')-my-r-po"
   printf 'g%.0s' $(seq 1 4500) > "$H/.claude/CLAUDE.md"
   echo "Project rules here." > "$root/CLAUDE.md"
   mkdir -p "$H/.claude/projects/$slug/memory"

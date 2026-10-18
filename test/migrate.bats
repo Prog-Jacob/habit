@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# migrate (v2 state to v3 files), the history.jsonl backfill, and the
+# migrate (v2 learnings to v3), the history.jsonl backfill, and the
 # session-start shim.
 
 load test_helper
@@ -36,39 +36,31 @@ JSON
   cp "$REPO/.claude/habits/settings.local.json" "$BATS_TEST_TMPDIR/p.before"
 }
 
-@test "migrate converts learnings, logs, and seeds, and leaves v2 files byte-identical" {
+@test "migrate copies learnings, writes .v3, and leaves habits and v2 files untouched" {
   seed_v2
   run hx "$H" "$REPO" migrate
   [ "$output" = "OK v3" ]
   [ "$(cat "$G/.v3")" = "3" ]
   cmp "$G/settings.local.json" "$BATS_TEST_TMPDIR/g.before"
   cmp "$REPO/.claude/habits/settings.local.json" "$BATS_TEST_TMPDIR/p.before"
+  [ ! -e "$G/log" ] && [ ! -e "$G/snapshots" ] && [ ! -d "$G/migrate.lock" ]
 
   run hx "$H" "$REPO" list-learnings
   [ "$output" = "$(printf '1. [run] scope overrides to the module\n2. [global] summaries stay short')" ]
 
-  run hx "$H" "$REPO" read-log
-  [ "$(echo "$output" | wc -l | tr -d ' ')" -eq 5 ]
-  [ "$(echo "$output" | jq -r 'select(.note=="only auth") | .project')" = "" ]
-  [ "$(echo "$output" | jq -r 'select(.note=="p only") | .project')" = "$REPO" ]
-  [ "$(echo "$output" | jq -r 'select(.note=="seed") | .id' | sort | tr '\n' ' ')" = "alpha proj-h " ]
-  [ -z "$(echo "$output" | jq -r 'select(.id=="") | .id')" ]
-  [ -f "$G/log/2026-08.jsonl" ] && [ -f "$G/log/2026-09.jsonl" ] && [ -f "$G/log/2026-10.jsonl" ]
-
-  [ "$(grep -cxF "$REPO" "$G/migrated-projects")" -eq 1 ]
-  ls "$G"/snapshots/migrate-*.tar.gz
-  [ ! -d "$G/migrate.lock" ]
+  # last_executed falls back to the frontmatter that v2 kept current.
   run hx "$H" "$REPO" read-index merged
-  [ "$(echo "$output" | jq -r '.entries[] | select(.id=="beta") | .last_executed')" = "2026-10-02T08:00:00Z" ]
+  [ "$(echo "$output" | jq -r '.entries[] | select(.id=="alpha") | .last_executed')" = "2026-09-15T10:00:00Z" ]
+  [ "$(echo "$output" | jq -r '.entries[] | select(.id=="proj-h") | .last_executed')" = "2026-08-20T09:00:00Z" ]
 }
 
 @test "a failed step leaves no .v3 and no lock, and the next call completes it" {
   seed_v2
-  touch "$G/log"
+  mkdir "$G/learnings.jsonl"
   run hx "$H" "$H/plain" migrate
   [ ! -f "$G/.v3" ]
   [ ! -d "$G/migrate.lock" ]
-  rm "$G/log"
+  rmdir "$G/learnings.jsonl"
   run hx "$H" "$H/plain" migrate
   [ "$output" = "OK v3" ]
   [ "$(wc -l < "$G/learnings.jsonl" | tr -d ' ')" -eq 2 ]
@@ -81,17 +73,14 @@ JSON
     (cd "$REPO" && HOME="$H" bash "$TOOLS" migrate >/dev/null 2>&1) &
   done
   wait
-  run hx "$H" "$REPO" read-log
-  [ "$(echo "$output" | wc -l | tr -d ' ')" -eq 5 ]
+  [ -f "$G/.v3" ]
   [ "$(wc -l < "$G/learnings.jsonl" | tr -d ' ')" -eq 2 ]
-  [ "$(ls "$G"/snapshots/migrate-*.tar.gz | wc -l | tr -d ' ')" -eq 1 ]
-  [ "$(wc -l < "$G/migrated-projects" | tr -d ' ')" -eq 1 ]
 }
 
 @test "a fresh lock makes migrate return quietly and a stale lock is taken over" {
   seed_v2
   mkdir "$G/migrate.lock"
-  run hx "$H" "$H/plain" read-index global
+  run hx "$H" "$H/plain" read-index merged
   [ ! -f "$G/.v3" ]
   assert_contains '"alpha"' "$output"
   touch -t 202601010000 "$G/migrate.lock"
@@ -100,16 +89,11 @@ JSON
   [ ! -d "$G/migrate.lock" ]
 }
 
-@test "any CLI call migrates lazily, and another project migrates on first touch" {
+@test "any CLI call migrates lazily" {
   seed_v2
-  run hx "$H" "$H/plain" read-index global
+  run hx "$H" "$H/plain" read-index merged
   [ -f "$G/.v3" ]
-  [ ! -f "$G/migrated-projects" ]
-  [ "$(hx "$H" "$H/plain" read-log | jq -r 'select(.project != "") | .id')" = "" ]
-  hx "$H" "$REPO" read-index merged >/dev/null
-  hx "$H" "$REPO" read-index merged >/dev/null
-  [ "$(hx "$H" "$H/plain" read-log | jq -r 'select(.project != "") | .id' | sort | tr '\n' ' ')" = "proj-h proj-h " ]
-  [ "$(grep -cxF "$REPO" "$G/migrated-projects")" -eq 1 ]
+  [ "$(wc -l < "$G/learnings.jsonl" | tr -d ' ')" -eq 2 ]
 }
 
 # history <days ago> <sessionId> <display>: one history.jsonl line.
@@ -140,7 +124,6 @@ history_line() {
   [ "$(jq -r 'select(.sid=="s-a") | .prompt' "$bf" | tail -n 1)" = "deploy with token=[redacted] to staging now" ]
   [ "$(jq -r 'select(.sid=="s-c") | [.host, .cwd, .prompt] | join("|")' "$bf")" = "claude|/w/repo|/tmp/out.log is empty again" ]
   refute_contains "long ago" "$(cat "$bf")"
-  [ ! -f "$h/.claude/habits/backfill-skipped" ]
   run ls -l "$bf"
   [ "${output:0:10}" = "-rw-------" ]
 }
@@ -154,27 +137,27 @@ history_line() {
   [ "$(wc -l < "$h/.claude/habits/inbox/claude-backfill-01.jsonl" | tr -d ' ')" -eq 1 ]
 }
 
-@test "backfill skips an unexpected format or a missing file and leaves a marker" {
+@test "backfill skips an unexpected format or a missing file" {
   local h
   h=$(new_home bf2)
   echo '{"text":"no display here","when":1}' > "$h/.claude/history.jsonl"
   run hx "$h" "$h" migrate
-  [ -f "$h/.claude/habits/backfill-skipped" ]
-  [ ! -e "$h/.claude/habits/inbox/claude-backfill-00.jsonl" ]
   [ "$output" = "OK v3" ]
-  local h2
-  h2=$(new_home bf3)
-  run hx "$h2" "$h2" migrate
-  [ -f "$h2/.claude/habits/backfill-skipped" ]
+  [ ! -e "$h/.claude/habits/inbox" ]
+  h=$(new_home bf3)
+  run hx "$h" "$h" migrate
+  [ "$output" = "OK v3" ]
+  [ ! -e "$h/.claude/habits/inbox" ]
 }
 
 # --- Shim ---
 
 shim_target() { sed -n 's/^exec bash "\(.*\)" "\$@"$/\1/p' "$1"; }
 
-@test "session-start writes an executable shim to this copy, migrates, and prints nothing" {
+@test "session-start writes an executable shim to this copy, migrates, backfills, and prints nothing" {
   local h
   h=$(new_home ss)
+  history_line 1 s-ss "a prompt to backfill here" > "$h/.claude/history.jsonl"
   run bash -c "cd '$h' && echo '{\"session_id\":\"x\"}' | HOME='$h' bash '$TOOLS' session-start"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
@@ -187,8 +170,8 @@ shim_target() { sed -n 's/^exec bash "\(.*\)" "\$@"$/\1/p' "$1"; }
   run bash "$shim" env-context /nonexistent
   [ "$output" = "installed" ]
   local i
-  for i in $(seq 1 50); do [ -f "$h/.claude/habits/backfill-skipped" ] && break; sleep 0.1; done
-  [ -f "$h/.claude/habits/backfill-skipped" ]
+  for i in $(seq 1 50); do [ -s "$h/.claude/habits/inbox/claude-backfill-00.jsonl" ] && break; sleep 0.1; done
+  [ "$(jq -r .prompt "$h/.claude/habits/inbox/claude-backfill-00.jsonl")" = "a prompt to backfill here" ]
 }
 
 @test "shim: a newer recorded version wins, older or equal is replaced, a missing target is rewritten" {

@@ -30,18 +30,9 @@ due_check() {
   [ "${DUE_OLDEST:-0}" -gt 0 ] && [ $((now - DUE_OLDEST)) -ge "$NUDGE_AGE" ]
 }
 
-# The epoch in nudge.next, or nothing when absent or malformed.
-nudge_next() {
-  local next
-  next=$(cat "$GLOBAL_DIR/nudge.next" 2>/dev/null) || return 1
-  case "$next" in ''|*[!0-9]*) return 1 ;; esac
-  echo "$next"
-}
-
 nudge_throttled() {
   local next
-  next=$(nudge_next) || return 1
-  [ "$next" -gt "$(date +%s)" ]
+  next=$(epoch_from "$GLOBAL_DIR/nudge.next") && [ "$next" -gt "$(date +%s)" ]
 }
 
 # nudge_set_next <seconds>: no notice before now + <seconds>. Prints the epoch.

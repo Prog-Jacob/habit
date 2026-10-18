@@ -1,12 +1,13 @@
 # common.sh: Shared constants and helpers for habit-tools.
 
 GLOBAL_DIR="$HOME/.claude/habits"
-INBOX_CAP=400
-RULE_BODY_MAX=600
-RULES_BUDGET=8000
+# Limits read by other libs.
+# shellcheck disable=SC2034
+INBOX_CAP=400 RULE_BODY_MAX=600 RULES_BUDGET=8000
+JQ_MISSING="habit needs jq. Install it (macOS: brew install jq, Debian or Ubuntu: sudo apt install jq), then start a new session."
 
 require_jq() {
-  command -v jq &>/dev/null || { echo "Error: jq is required but not installed" >&2; exit 1; }
+  command -v jq &>/dev/null || { echo "$JQ_MISSING" >&2; exit 1; }
 }
 
 # Hidden temp file beside the target, so mv is a same-filesystem rename and
@@ -18,6 +19,14 @@ atomic_write_file() {
   if ! { cat > "$tmp" && mv "$tmp" "$target"; }; then
     rm -f "$tmp"; return 1
   fi
+}
+
+# epoch_from <file>: the epoch the file holds, or fail when absent or malformed.
+epoch_from() {
+  local e
+  e=$(cat "$1" 2>/dev/null) || return 1
+  case "$e" in ''|*[!0-9]*) return 1 ;; esac
+  echo "$e"
 }
 
 # Captured files not yet distilled: inbox/*.jsonl and unfinished claimed runs.

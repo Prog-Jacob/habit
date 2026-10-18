@@ -20,75 +20,58 @@ _valid_id() {
 
 cmd_read_habit() {
   [ $# -eq 0 ] && { echo "NOT_FOUND"; exit 0; }
-
-  if [ $# -eq 1 ]; then
-    local resolved
-    if resolved=$(_resolve_habit "$1"); then
+  local id resolved
+  for id in "$@"; do
+    [ $# -eq 1 ] || echo "---HABIT:$id---"
+    if resolved=$(_resolve_habit "$id"); then
       echo "SCOPE:${resolved%% *}"
       cat "${resolved#* }"
     else
       echo "NOT_FOUND"
     fi
-  else
-    for id in "$@"; do
-      echo "---HABIT:$id---"
-      local resolved
-      if resolved=$(_resolve_habit "$id"); then
-        echo "SCOPE:${resolved%% *}"
-        cat "${resolved#* }"
-      else
-        echo "NOT_FOUND"
-      fi
-    done
-  fi
+  done
 }
 
-# Body length in characters: the text after the closing frontmatter line, trimmed.
-habit_body_length() {
-  printf '%s\n' "$1" | awk 'n >= 2 { print } /^---$/ { n++ }' | jq -Rs 'gsub("^\\s+|\\s+$"; "") | length'
-}
-
-# kind is rule or procedure (missing means procedure); a rule body stays short
-# because every session loads it.
-_check_kind() {
-  local len
-  case "$fm_kind" in
+# _check_habit <id> <file>: the frontmatter id matches, a description exists,
+# and kind is rule or procedure (missing means procedure). A rule body (the
+# text after the frontmatter, trimmed) stays short because every session loads it.
+_check_habit() {
+  local fid fdesc fkind fbody len
+  IFS=$'\037' read -r _ _ _ fid _ fdesc _ _ _ _ fkind fbody < <(_frontmatter_rows "$2")
+  [ "$fid" = "$1" ] || { echo "Frontmatter id '${fid:-missing}' does not match $1" >&2; return 1; }
+  [ -n "$fdesc" ] || { echo "Missing frontmatter description for $1" >&2; return 1; }
+  case "$fkind" in
     ''|procedure) return 0 ;;
     rule) ;;
-    *) echo "Invalid kind '$fm_kind' for $1: use rule or procedure" >&2; exit 1 ;;
+    *) echo "Invalid kind '$fkind' for $1: use rule or procedure" >&2; return 1 ;;
   esac
-  len=$(habit_body_length "$2")
+  len=$(printf '%s' "$fbody" | jq -Rs 'gsub("\u001d"; "\n") | gsub("^\\s+|\\s+$"; "") | length')
   [ "$len" -le "$RULE_BODY_MAX" ] || {
     echo "Rule $1 body is $len characters; a rule body must be at most $RULE_BODY_MAX. Shorten it or make it kind: procedure." >&2
-    exit 1
+    return 1
   }
 }
 
+# write-habit <scope> <id> [content]: validate a hidden temp file in the target
+# dir, then rename it into place. A dir created for a rejected write is removed.
 cmd_write_habit() {
-  local scope="$1"
-  local id="$2"
+  local scope="${1:-}" id="${2:-}" content dir fresh="" tmp
   _valid_id "$id"
-  local content="${3:-$(cat)}"
-
-  local tmp
-  tmp=$(mktemp)
-  printf '%s\n' "$content" >"$tmp"
-  parse_frontmatter "$tmp"
-  rm -f "$tmp"
-  [ "$fm_id" = "$id" ] || { echo "Frontmatter id '${fm_id:-missing}' does not match $id" >&2; exit 1; }
-  [ -n "$fm_description" ] || { echo "Missing frontmatter description for $id" >&2; exit 1; }
-  _check_kind "$id" "$content"
-
-  local dir
+  content="${3:-$(cat)}"
   case "$scope" in
     global) dir="$GLOBAL_DIR" ;;
     project) dir=$(project_dir) || dir="$(project_new_root)/.claude/habits" ;;
     *) echo "Unknown scope: $scope" >&2; exit 1 ;;
   esac
+  [ -d "$dir" ] || fresh=1
   mkdir -p "$dir"
-  local habit_file="$dir/$id.md"
-  printf '%s\n' "$content" | atomic_write_file "$habit_file"
-  echo "OK wrote $habit_file"
+  tmp=$(mktemp "$dir/.$id.md.XXXXXX")
+  if ! { printf '%s\n' "$content" > "$tmp" && _check_habit "$id" "$tmp" && mv "$tmp" "$dir/$id.md"; }; then
+    rm -f "$tmp"
+    if [ -n "$fresh" ]; then rmdir "$dir" "${dir%/*}" 2>/dev/null || true; fi
+    exit 1
+  fi
+  echo "OK wrote $dir/$id.md"
 }
 
 # delete-habit <scope> <id>: remove one habit file. Never creates dirs.

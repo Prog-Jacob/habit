@@ -1,16 +1,9 @@
 # index.sh: Habit index derived from the *.md frontmatter on every read.
 
-# One awk pass over the global and project habit files. One \037-joined row per
-# file: scope path stem id tags description created updated archived last_executed
-# kind body, where body is kept for rules only, its lines joined by \035.
-_index_rows() {
-  local pdir="${1:-}" f
-  local files=()
-  for f in "$GLOBAL_DIR"/*.md; do [ -f "$f" ] && files+=("$f"); done
-  if [ -n "$pdir" ]; then
-    for f in "$pdir"/*.md; do [ -f "$f" ] && files+=("$f"); done
-  fi
-  [ ${#files[@]} -eq 0 ] && return 0
+# One awk pass over <file>... One \037-joined row per file: scope path stem id
+# tags description created updated archived last_executed kind body, where body
+# is kept for rules only, its lines joined by \035.
+_frontmatter_rows() {
   awk -v g="$GLOBAL_DIR/" '
     function emit(  s, stem) {
       if (file == "") return
@@ -25,7 +18,17 @@ _index_rows() {
     $0 == "---" { n++; next }
     n == 1 { k = $0; sub(/:.*/, "", k); val = $0; sub(/^[^:]*:/, "", val); sub(/^ +/, "", val); v[k] = val }
     END { emit() }
-  ' "${files[@]}"
+  ' "$@"
+}
+
+# Rows for the global habit files and those in [project habits dir].
+_index_rows() {
+  local pdir="${1:-}" f files=()
+  for f in "$GLOBAL_DIR"/*.md; do [ -f "$f" ] && files+=("$f"); done
+  if [ -n "$pdir" ]; then
+    for f in "$pdir"/*.md; do [ -f "$f" ] && files+=("$f"); done
+  fi
+  [ ${#files[@]} -eq 0 ] || _frontmatter_rows "${files[@]}"
 }
 
 INDEX_JQ_DEFS='
@@ -39,7 +42,7 @@ def valid: .id != "" and .id == .stem and .description != "";
 # last_executed comes from the usage log, falling back to frontmatter.
 cmd_read_index() {
   local scope="${1:-merged}" mode="${2:-}" proot="" pdir=""
-  case "$scope" in global|project|merged) ;; *) echo "Unknown scope: $scope" >&2; exit 1 ;; esac
+  case "$scope" in project|merged) ;; *) echo "Unknown scope: $scope" >&2; exit 1 ;; esac
   if proot=$(project_root); then pdir="$proot/.claude/habits"; else proot=""; fi
   log_lines | jq -nR --rawfile rows <(_index_rows "$pdir") \
     --arg scope "$scope" --arg mode "$mode" --arg proot "$proot" "$INDEX_JQ_DEFS"'
@@ -54,8 +57,7 @@ cmd_read_index() {
        + (if $le != "" then {last_executed: $le} else {} end)
        + (if $r.kind != "" then {kind: $r.kind} else {} end)] as $all
     | ($all | map(select(.scope == "project"))) as $p
-    | (if $scope == "global" then $all | map(select(.scope == "global"))
-       elif $scope == "project" then $p
+    | (if $scope == "project" then $p
        else ($p | map(.id)) as $pids
          | $p + ($all | map(select(.scope == "global" and (.id as $i | any($pids[]; . == $i) | not))))
        end)

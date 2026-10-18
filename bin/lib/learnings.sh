@@ -33,9 +33,9 @@ cmd_list_learnings() {
   _active_learnings | jq -r 'to_entries[] | "\(.key + 1). [\(.value.target)] \(.value.note)"'
 }
 
-cmd_forget_learning() {
+forget_learning() {
   local n="${1:-}" id
-  case "$n" in ''|*[!0-9]*) echo "Usage: forget-learning <n>" >&2; exit 1 ;; esac
+  case "$n" in ''|*[!0-9]*) echo "Usage: watch forget <n>" >&2; exit 1 ;; esac
   id=$(_active_learnings | jq -r --argjson n "$n" 'if $n >= 1 then .[$n - 1].id // empty else empty end')
   [ -n "$id" ] || { echo "No learning number $n" >&2; exit 1; }
   _append_learning_line "$(jq -nc --arg id "$id" '{forget: $id, ts: (now | todate)}')"

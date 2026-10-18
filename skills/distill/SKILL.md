@@ -36,11 +36,11 @@ Any other words in the argument are feedback about habit itself. Treat them as f
 ## Undo
 
 1. Run `bash ~/.claude/habits/bin/habit-tools.sh undo`.
-2. If it printed "Nothing to undo", say so. Otherwise report the files it changed (habits removed, habits restored to their earlier text, learnings rolled back) and say the prompts from that run will be distilled again next time. Stop.
+2. If it printed "Nothing to undo", say so. Otherwise report the files it changed (habits removed, habits restored to their earlier text, learnings rolled back) and say the prompts from that run will be distilled again next time. Running undo again steps one more run back. Stop.
 
 ## Sweep
 
-1. Claim the inbox: `bash ~/.claude/habits/bin/habit-tools.sh claim`. On `EMPTY` in the default branch, say there is nothing new to distill and stop. On `EMPTY` in the maintain branch, take a snapshot instead with `bash ~/.claude/habits/bin/habit-tools.sh snapshot maintain` so the run stays undoable, then run Maintain and Learnings and go to the summary. That run claimed nothing, so there is nothing to finish.
+1. Claim the inbox: `bash ~/.claude/habits/bin/habit-tools.sh claim`. On `EMPTY` in the default branch, say there is nothing new to distill and stop. On `EMPTY` in the maintain branch, take a snapshot instead with `bash ~/.claude/habits/bin/habit-tools.sh snapshot` so the run stays undoable, then run Maintain and Learnings and go to the summary. That run claimed nothing, so there is nothing to finish.
 2. Note the `RUN <id>` line. A `REMAINING <n>` line means more prompts are waiting than one run takes.
 3. The prompts follow in groups headed `---PROJECT:<dir>---` or `---PROJECT:global---`. Each prompt may carry a `ctx:` line: the assistant message the prompt replied to. Use it to understand short replies such as "yes, and no hyphens either", but never extract habits from the ctx text itself.
 4. Process each group by the processing rules: classify, interpret, dedup, scope. A candidate the user already states in a context file is covered: skip it and mention it as covered in the summary. Use the CONTEXT section for the current project; for another project group, read its files with `bash ~/.claude/habits/bin/habit-tools.sh context-files <dir>`.

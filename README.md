@@ -103,7 +103,7 @@ The override is woven into the instruction ("fix all TypeScript errors **in the 
 ```
 /habit:distill            # turn captured prompts into habits
 /habit:distill maintain   # also classify rules and procedures, tighten rules, clean up
-/habit:distill undo       # restore everything the last run changed
+/habit:distill undo       # restore everything the last run changed; again to step further back
 ```
 
 **Watch habit itself:**
@@ -127,7 +127,7 @@ The override is woven into the instruction ("fix all TypeScript errors **in the 
 | `/habit:edit <id> [change]` | Create, update, or delete a habit in plain words. You can also set its kind. |
 | `/habit:distill` | Turn captured prompts from every project into new or merged habits. |
 | `/habit:distill maintain` | Distill, then classify every habit as a rule or a procedure, rewrite rules to be terse, archive habits your `CLAUDE.md`, `AGENTS.md`, or memory already states, merge duplicates, and archive stale procedures. |
-| `/habit:distill undo` | Undo the last distill run and queue its prompts again. An undo can itself be undone. |
+| `/habit:distill undo` | Undo the last distill run and queue its prompts again. Each further undo steps one run back. |
 | `/habit:watch [status]` | Show installed copies, capture per host, the backlog, the last distill, habit counts, the rule budget, learnings, and integrity checks. |
 | `/habit:watch off [hours]` / `on` | Pause capture everywhere for 8 hours or the given hours, or resume it. |
 | `/habit:watch snooze [days]` | Silence the distill reminder for 7 days or the given days. |
@@ -165,7 +165,7 @@ The override is woven into the instruction ("fix all TypeScript errors **in the 
 
 ## Platforms
 
-macOS and Linux. Windows through WSL only. Habit needs only bash 3.2 or later and jq.
+macOS and Linux, including root in containers. Windows through WSL only. Habit needs bash 3.2 or later, jq 1.6 or later, and standard tools (awk, sed, tar). CI runs the suite on macOS (bash 3.2 with jq 1.7 and the latest jq), Ubuntu (jq 1.7), and Debian 12 (jq 1.6) as a normal user and as root.
 
 ---
 

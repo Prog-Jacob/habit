@@ -1,26 +1,26 @@
 # snapshot.sh: snapshots/<run>.tar.gz of habit files and learnings, for undo.
 # Layout inside the tarball: DIRS (covered dirs), MANIFEST (absolute *.md paths
-# that existed), optional UNDID (run an undo re-queued), optional LABEL, and
-# root/<abs path> copies.
+# that existed), optional UNDID (the run an undo reverted), and root/<abs path>
+# copies.
 
 SNAP_DIR_NAME="snapshots"
 
-# UTC run id; waits a second when <prefix><id> is already taken.
+# UTC run id; waits a second when the id is already taken.
 new_run_id() {
-  local prefix="${1:-}" id
+  local id
   while :; do
-    id="$prefix$(date -u +%Y%m%dT%H%M%SZ)"
-    [ -e "$GLOBAL_DIR/$SNAP_DIR_NAME/$id.tar.gz" ] || [ -e "$GLOBAL_DIR/inbox/.claimed/$id" ] \
-      || [ -e "$GLOBAL_DIR/inbox/.done/$id" ] || { echo "$id"; return 0; }
+    id=$(date -u +%Y%m%dT%H%M%SZ)
+    [ -e "$GLOBAL_DIR/$SNAP_DIR_NAME/$id.tar.gz" ] || [ -e "$GLOBAL_DIR/$SNAP_DIR_NAME/undo-$id.tar.gz" ] \
+      || [ -e "$GLOBAL_DIR/inbox/.claimed/$id" ] || [ -e "$GLOBAL_DIR/inbox/.done/$id" ] || { echo "$id"; return 0; }
     sleep 1
   done
 }
 
-# snapshot_create <run> <dir>...  (set SNAP_UNDID to record a re-queued run,
-# SNAP_LABEL to record why the snapshot was taken)
+# snapshot_create <run> <undid> <dir>...: <undid> names the run an undo
+# reverts, or is empty.
 snapshot_create() {
-  local run="$1" d f stage
-  shift
+  local run="$1" undid="$2" d f stage
+  shift 2
   mkdir -p "$GLOBAL_DIR/$SNAP_DIR_NAME"
   stage=$(mktemp -d "$GLOBAL_DIR/$SNAP_DIR_NAME/.stage.XXXXXX") || return 1
   : > "$stage/DIRS"; : > "$stage/MANIFEST"
@@ -38,8 +38,7 @@ snapshot_create() {
     mkdir -p "$stage/root$GLOBAL_DIR"
     cp -p "$GLOBAL_DIR/learnings.jsonl" "$stage/root$GLOBAL_DIR/"
   fi
-  if [ -n "${SNAP_UNDID:-}" ]; then echo "$SNAP_UNDID" > "$stage/UNDID"; fi
-  if [ -n "${SNAP_LABEL:-}" ]; then echo "$SNAP_LABEL" > "$stage/LABEL"; fi
+  if [ -n "$undid" ]; then echo "$undid" > "$stage/UNDID"; fi
   local rc=0
   tar -czf "$GLOBAL_DIR/$SNAP_DIR_NAME/$run.tar.gz" -C "$stage" . || rc=1
   rm -rf "$stage"
@@ -74,7 +73,7 @@ snapshot_restore() {
   f="$stage/root$GLOBAL_DIR/learnings.jsonl"
   live="$GLOBAL_DIR/learnings.jsonl"
   if [ -f "$f" ]; then
-    cmp -s "$f" "$live" || { cat "$f" > "$live" && echo "$live"; }
+    cmp -s "$f" "$live" || { atomic_write_file "$live" < "$f" && echo "$live"; }
   elif [ -f "$live" ]; then
     rm -f "$live" && echo "$live"
   fi
@@ -98,13 +97,13 @@ snapshot_prune() {
   done
 }
 
-# snapshot [label]: a distill run snapshot of the global and current project
+# snapshot: a distill run snapshot of the global and current project
 # habits without claiming the inbox, so a write-only run can still be undone.
 cmd_snapshot() {
-  local run dirs=("$GLOBAL_DIR") root SNAP_LABEL="${1:-}"
+  local run dirs=("$GLOBAL_DIR") root
   if root=$(project_root); then dirs+=("$root/.claude/habits"); fi
   run=$(new_run_id)
-  snapshot_create "$run" "${dirs[@]}" || { echo "Snapshot failed" >&2; exit 1; }
+  snapshot_create "$run" "" "${dirs[@]}" || { echo "Snapshot failed" >&2; exit 1; }
   snapshot_prune 10
   echo "RUN $run"
 }

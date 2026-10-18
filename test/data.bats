@@ -21,7 +21,7 @@ load test_helper
   [ "$output" = "$(printf 'scope overrides to the module\nsummaries stay short')" ]
 
   cp "$h/.claude/habits/learnings.jsonl" "$BATS_TEST_TMPDIR/before"
-  run hx "$h" "$h" forget-learning 2
+  run hx "$h" "$h" watch forget 2
   assert_contains "OK" "$output"
   # Append only: the old bytes are a prefix of the new file.
   [ "$(head -c "$(wc -c < "$BATS_TEST_TMPDIR/before")" "$h/.claude/habits/learnings.jsonl")" = "$(cat "$BATS_TEST_TMPDIR/before")" ]
@@ -33,13 +33,13 @@ load test_helper
   [ "$output" = "scope overrides to the module" ]
 }
 
-@test "forget-learning rejects an out of range number and writes nothing" {
+@test "watch forget rejects an out of range number and writes nothing" {
   local h
   h=$(new_home lrn2)
   hx "$h" "$h" write-learning run "only one" >/dev/null
-  run hx "$h" "$h" forget-learning 5
+  run hx "$h" "$h" watch forget 5
   [ "$status" -ne 0 ]
-  run hx "$h" "$h" forget-learning x
+  run hx "$h" "$h" watch forget x
   [ "$status" -ne 0 ]
   [ "$(wc -l < "$h/.claude/habits/learnings.jsonl" | tr -d ' ')" -eq 1 ]
 }
@@ -129,8 +129,8 @@ resolve() { # resolve <home> <start>
 @test "derived index entries carry the frontmatter fields in the v2 index shape" {
   seed_fixtures
   source_libs
-  run cmd_read_index global
-  [ "$(echo "$output" | jq -c '[.entries[].id]')" = '["cleanup-writing","old-habit","smart-tests"]' ]
+  run cmd_read_index merged
+  [ "$(echo "$output" | jq -c '[.entries[] | select(.scope == "global") | .id]')" = '["cleanup-writing","old-habit","smart-tests"]' ]
   [ "$(echo "$output" | jq -c '.entries[0]')" = '{"id":"cleanup-writing","tags":["writing","quality"],"description":"Replace em dashes with natural punctuation.","scope":"global","created":"2026-05-04T00:00:00Z","updated":"2026-05-07T00:00:00Z","archived":false}' ]
   [ "$(echo "$output" | jq -r '.entries[] | select(.id=="old-habit") | .archived')" = "true" ]
   run cmd_read_index project
@@ -145,8 +145,7 @@ resolve() { # resolve <home> <start>
   run cmd_read_index merged
   [ "$(echo "$output" | jq '[.entries[] | select(.id=="smart-tests")] | length')" -eq 1 ]
   [ "$(echo "$output" | jq -r '.entries[] | select(.id=="smart-tests") | .scope')" = "project" ]
-  run cmd_read_index global
-  [ "$(echo "$output" | jq -r '.entries[] | select(.id=="smart-tests") | .description')" = "Write focused tests." ]
+  grep -qx 'description: Write focused tests.' "$TEST_GLOBAL/smart-tests.md"
   teardown_fixtures
 }
 
@@ -191,7 +190,7 @@ JSONL
   seed_fixtures
   source_libs
   printf -- '---\nid: ruled\ndescription: A rule.\nkind: rule\n---\nBody.\n' > "$TEST_GLOBAL/ruled.md"
-  run cmd_read_index global
+  run cmd_read_index merged
   [ "$(echo "$output" | jq -r '.entries[] | select(.id=="ruled") | .kind')" = "rule" ]
   [ "$(echo "$output" | jq -r '.entries[] | select(.id=="smart-tests") | has("kind")')" = "false" ]
   teardown_fixtures
