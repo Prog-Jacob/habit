@@ -1,6 +1,7 @@
 # snapshot.sh: snapshots/<run>.tar.gz of habit files and learnings, for undo.
 # Layout inside the tarball: DIRS (covered dirs), MANIFEST (absolute *.md paths
-# that existed), optional UNDID (run an undo re-queued), root/<abs path> copies.
+# that existed), optional UNDID (run an undo re-queued), optional LABEL, and
+# root/<abs path> copies.
 
 SNAP_DIR_NAME="snapshots"
 
@@ -15,7 +16,8 @@ new_run_id() {
   done
 }
 
-# snapshot_create <run> <dir>...  (set SNAP_UNDID to record a re-queued run)
+# snapshot_create <run> <dir>...  (set SNAP_UNDID to record a re-queued run,
+# SNAP_LABEL to record why the snapshot was taken)
 snapshot_create() {
   local run="$1" d f stage
   shift
@@ -37,6 +39,7 @@ snapshot_create() {
     cp -p "$GLOBAL_DIR/learnings.jsonl" "$stage/root$GLOBAL_DIR/"
   fi
   if [ -n "${SNAP_UNDID:-}" ]; then echo "$SNAP_UNDID" > "$stage/UNDID"; fi
+  if [ -n "${SNAP_LABEL:-}" ]; then echo "$SNAP_LABEL" > "$stage/LABEL"; fi
   local rc=0
   tar -czf "$GLOBAL_DIR/$SNAP_DIR_NAME/$run.tar.gz" -C "$stage" . || rc=1
   rm -rf "$stage"
@@ -93,4 +96,15 @@ snapshot_prune() {
   snapshot_runs | head -n $((total - keep)) | while IFS= read -r run; do
     rm -f "$GLOBAL_DIR/$SNAP_DIR_NAME/$run.tar.gz"
   done
+}
+
+# snapshot [label]: a distill run snapshot of the global and current project
+# habits without claiming the inbox, so a write-only run can still be undone.
+cmd_snapshot() {
+  local run dirs=("$GLOBAL_DIR") root SNAP_LABEL="${1:-}"
+  if root=$(project_root); then dirs+=("$root/.claude/habits"); fi
+  run=$(new_run_id)
+  snapshot_create "$run" "${dirs[@]}" || { echo "Snapshot failed" >&2; exit 1; }
+  snapshot_prune 10
+  echo "RUN $run"
 }

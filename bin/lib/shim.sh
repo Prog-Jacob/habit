@@ -1,4 +1,4 @@
-# shim.sh: SessionStart hook: the fixed CLI path, migrate-if-needed, the nudge.
+# shim.sh: SessionStart hook: the fixed CLI path, migrate-if-needed, rules, the nudge.
 
 # Exit 0 when version $1 is malformed or not newer than $2 (X.Y.Z, numeric).
 _version_le() {
@@ -34,13 +34,23 @@ write_shim() {
   return 1
 }
 
-# stdout is the host's hook output: only the nudge JSON may reach it. Cursor
-# gets its notice from preCompact instead.
+# stdout is the host's hook output: only one JSON object may reach it, with the
+# rules context and the throttled distill notice. A resumed session already
+# holds the rules. Cursor reads its rules through rules/habit.mdc and gets its
+# notice from preCompact, so it prints nothing here.
 cmd_session_start() {
-  local input=""
+  local input="" re_cwd='"cwd"[[:space:]]*:[[:space:]]*"([^"\\]*)"'
+  local re_resume='"source"[[:space:]]*:[[:space:]]*"resume"' resume="" due="" rules="" notice=""
   [ -t 0 ] || input=$(cat 2>/dev/null) || input=""
+  if [[ $input =~ $re_cwd ]] && [ -d "${BASH_REMATCH[1]}" ]; then cd "${BASH_REMATCH[1]}" || true; fi
   write_shim >/dev/null 2>&1 || true
   migrate_if_needed bg >/dev/null 2>&1 || true
   case "$input" in *'"cursor_version"'*) return 0 ;; esac
-  nudge_session_start || true
+  if [[ $input =~ $re_resume ]]; then resume=1; fi
+  if [ -n "$resume" ] && nudge_throttled; then return 0; fi
+  if due_check; then due=$(_nudge_text); fi
+  if [ -z "$resume" ]; then rules=$(rules_render "$due" 2>/dev/null) || rules=""; fi
+  if [ -n "$due" ] && ! nudge_throttled && nudge_set_next 86400 >/dev/null; then notice="$due"; fi
+  [ -n "$rules$notice" ] || return 0
+  session_start_json "$rules" "$notice" || true
 }

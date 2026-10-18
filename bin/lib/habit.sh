@@ -43,6 +43,27 @@ cmd_read_habit() {
   fi
 }
 
+# Body length in characters: the text after the closing frontmatter line, trimmed.
+habit_body_length() {
+  printf '%s\n' "$1" | awk 'n >= 2 { print } /^---$/ { n++ }' | jq -Rs 'gsub("^\\s+|\\s+$"; "") | length'
+}
+
+# kind is rule or procedure (missing means procedure); a rule body stays short
+# because every session loads it.
+_check_kind() {
+  local len
+  case "$fm_kind" in
+    ''|procedure) return 0 ;;
+    rule) ;;
+    *) echo "Invalid kind '$fm_kind' for $1: use rule or procedure" >&2; exit 1 ;;
+  esac
+  len=$(habit_body_length "$2")
+  [ "$len" -le "$RULE_BODY_MAX" ] || {
+    echo "Rule $1 body is $len characters; a rule body must be at most $RULE_BODY_MAX. Shorten it or make it kind: procedure." >&2
+    exit 1
+  }
+}
+
 cmd_write_habit() {
   local scope="$1"
   local id="$2"
@@ -56,6 +77,7 @@ cmd_write_habit() {
   rm -f "$tmp"
   [ "$fm_id" = "$id" ] || { echo "Frontmatter id '${fm_id:-missing}' does not match $id" >&2; exit 1; }
   [ -n "$fm_description" ] || { echo "Missing frontmatter description for $id" >&2; exit 1; }
+  _check_kind "$id" "$content"
 
   local dir
   case "$scope" in

@@ -70,11 +70,15 @@ nudge_emit() {
   printf '%s\n' "$out"
 }
 
-# Claude SessionStart: systemMessage for the terminal, and one context line so
+# session_start_json <rules> <notice or empty>: the one Claude SessionStart
+# object. additionalContext holds the rules and, with a notice, one line so
 # Desktop and IDE sessions, where systemMessage does not show, still hear it.
-nudge_session_start() {
-  nudge_emit '{systemMessage: $m, hookSpecificOutput: {hookEventName: "SessionStart",
-    additionalContext: "habit has \($n) captured prompts waiting. Mention once, briefly, that /habit:distill processes them."}}'
+session_start_json() {
+  jq -nc --arg r "$1" --arg m "$2" --arg n "${DUE_BACKLOG:-0}" '
+    {hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: ([$r,
+      (if $m != "" then "habit has \($n) captured prompts waiting. Mention once, briefly, that /habit:distill processes them." else empty end)]
+      | map(select(. != "")) | join("\n"))}}
+    + (if $m != "" then {systemMessage: $m} else {} end)'
 }
 
 # Cursor preCompact: user_message is shown to the user.

@@ -7,5 +7,6 @@
   "repository": "https://github.com/Prog-Jacob/habit",
   "keywords": ["habits", "prompts", "workflows", "productivity", "automation"],
   "skills": "./skills/",
-  "hooks": "./hooks/hooks.cursor.json"
+  "hooks": "./hooks/hooks.cursor.json",
+  "rules": "./rules/"
 }

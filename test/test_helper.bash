@@ -6,6 +6,10 @@ REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd -P)"
 TOOLS="$REPO_ROOT/bin/habit-tools.sh"
 HOOK="$REPO_ROOT/hooks/habit-hook.sh"
 
+# Run every test from its own temp dir. From the repo, the project walk-up
+# would climb past a temp HOME and reach the real ~/.claude/habits.
+cd "$BATS_TEST_TMPDIR" || exit 1
+
 # Substring assertions over an arbitrary string (not just $output).
 assert_contains() {
   if [[ "$2" != *"$1"* ]]; then

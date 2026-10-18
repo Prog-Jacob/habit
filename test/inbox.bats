@@ -171,3 +171,24 @@ new_md() { printf -- '---\nid: %s\ndescription: %s\n---\n\n%s\n' "$1" "$2" "$3";
   [ "$output" = "Nothing to undo" ]
   [ ! -d "$G/snapshots" ] || [ -z "$(ls "$G/snapshots")" ]
 }
+
+@test "snapshot on an empty inbox makes a distill run that undo restores" {
+  run hx "$H" "$REPO/src" claim
+  [ "$output" = "EMPTY" ]
+  run hx "$H" "$REPO/src" snapshot maintain
+  local run
+  run=$(echo "$output" | sed -n 's/^RUN //p')
+  [[ "$run" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]
+  [ "$(tar -xzOf "$G/snapshots/$run.tar.gz" ./LABEL)" = maintain ]
+  assert_contains "$REPO/.claude/habits/proj.md" "$(tar -xzOf "$G/snapshots/$run.tar.gz" ./MANIFEST)"
+  hx "$H" "$H" write-habit global keep "$(new_md keep 'Kept habit.' 'Rewritten as a rule.')" >/dev/null
+  hx "$H" "$H" write-habit global added "$(new_md added 'Added by maintain.' 'New.')" >/dev/null
+  (cd "$REPO/src" && HOME="$H" bash "$TOOLS" write-habit project proj "$(new_md proj 'Project habit.' 'Changed.')") >/dev/null
+  run hx "$H" "$REPO/src" undo
+  assert_contains "UNDO $run" "$output"
+  refute_contains "requeued" "$output"
+  assert_contains "Original body." "$(cat "$G/keep.md")"
+  assert_contains "Project body." "$(cat "$REPO/.claude/habits/proj.md")"
+  [ ! -f "$G/added.md" ]
+  [ ! -d "$G/inbox/.claimed" ]
+}

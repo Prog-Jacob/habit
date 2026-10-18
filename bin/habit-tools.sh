@@ -44,7 +44,8 @@ case "$cmd" in
   session-start)
     _migrate_libs
     source "$SCRIPT_DIR/lib/shim.sh"
-    source "$SCRIPT_DIR/lib/nudge.sh" ;;
+    source "$SCRIPT_DIR/lib/nudge.sh"
+    source "$SCRIPT_DIR/lib/rules.sh" ;;
   pre-compact)
     source "$SCRIPT_DIR/lib/nudge.sh" ;;
   migrate)
@@ -58,7 +59,13 @@ case "$cmd" in
     _status_libs ;;
   preload)
     _status_libs
+    source "$SCRIPT_DIR/lib/rules.sh"
+    source "$SCRIPT_DIR/lib/context.sh"
     source "$SCRIPT_DIR/lib/preload.sh" ;;
+  context-files)
+    source "$SCRIPT_DIR/lib/context.sh" ;;
+  snapshot)
+    source "$SCRIPT_DIR/lib/snapshot.sh" ;;
   env-context)
     cmd_env_context() {
       local root="${1:-$SCRIPT_DIR/..}"
@@ -72,7 +79,7 @@ case "$cmd" in
     ;;
   *)
     echo "Usage: habit-tools.sh <command> [args]" >&2
-    echo "Commands: preload, read-index, invalid-habits, read-habit, write-habit, delete-habit, log-exec, read-log, write-learning, read-learnings, list-learnings, forget-learning, status, watch, claim, finish, undo, capture, session-start, pre-compact, migrate, env-context" >&2
+    echo "Commands: preload, read-index, invalid-habits, read-habit, write-habit, delete-habit, log-exec, read-log, write-learning, read-learnings, list-learnings, forget-learning, status, watch, claim, finish, undo, snapshot, context-files, capture, session-start, pre-compact, migrate, env-context" >&2
     exit 1
     ;;
 esac

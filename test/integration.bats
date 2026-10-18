@@ -33,7 +33,7 @@ sections() { echo "$1" | sed -n 's/^===\([A-Z]*\)===$/\1/p' | tr '\n' ' '; }
   assert_contains "Habit Processing Rules" "$output"
 
   run hx "$h" "$h" preload distill
-  [ "$(sections "$output")" = "LEARNINGS INDEX LOG PROCESSING OPERATIONS " ]
+  [ "$(sections "$output")" = "LEARNINGS INDEX LOG CONTEXT PROCESSING OPERATIONS " ]
   assert_contains '"gone"' "$output"
   assert_contains '"sid":"sid-1"' "$output"
   assert_contains "Habit Operations Reference" "$output"
@@ -72,7 +72,7 @@ sections() { echo "$1" | sed -n 's/^===\([A-Z]*\)===$/\1/p' | tr '\n' ' '; }
   run hx "$h" "$h" preload distill
   chmod 644 "$h/.claude/habits/locked.md"
   [ "$status" -eq 0 ]
-  [ "$(sections "$output")" = "LEARNINGS INDEX LOG PROCESSING OPERATIONS " ]
+  [ "$(sections "$output")" = "LEARNINGS INDEX LOG CONTEXT PROCESSING OPERATIONS " ]
   assert_contains "locked.md" "$(echo "$output" | awk '/^===INDEX===$/{f=1; next} /^===/{f=0} f')"
 }
 

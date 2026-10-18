@@ -1,5 +1,5 @@
 {
-  "description": "Habit hooks. SessionStart writes the CLI shim, migrates once, and announces when distill is due. UserPromptSubmit captures each prompt into the local inbox.",
+  "description": "Habit hooks. SessionStart writes the CLI shim, migrates once, loads the standing rules, and announces when distill is due. UserPromptSubmit captures each prompt into the local inbox.",
   "hooks": {
     "SessionStart": [
       {

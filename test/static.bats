@@ -77,14 +77,29 @@ SKILL_NAMES="habit suggest edit watch distill"
   done
 }
 
-@test "distill claims, finishes, undoes, writes learnings, and checks env-context" {
+@test "distill claims, finishes, undoes, snapshots, reads context files, writes learnings, and checks env-context" {
   local body
   body=$(cat "$SKILLS/distill/SKILL.md")
-  for c in claim finish undo write-learning env-context "write-habit project"; do
+  for c in claim finish undo "snapshot maintain" context-files write-learning env-context "write-habit project"; do
     assert_contains "habit-tools.sh $c" "$body"
   done
   assert_contains "HABIT_PROJECT_DIR=<dir> bash ~/.claude/habits/bin/habit-tools.sh write-habit project" "$body"
   assert_contains "do not read or edit any plugin files" "$body"
+}
+
+@test "suggest skips habits already on an INJECTED line" {
+  assert_contains "INJECTED:" "$(cat "$SKILLS/suggest/SKILL.md")"
+}
+
+@test "the Cursor rule always applies, runs preload rules through the shim, and the manifest ships it" {
+  local mdc="$REPO_ROOT/rules/habit.mdc"
+  run grep -nF -e '${CLAUDE_PLUGIN_ROOT}' -e '${CURSOR_PLUGIN_ROOT}' -e '$(' "$mdc"
+  [ -z "$output" ]
+  [ "$(sed -n 1p "$mdc")" = "---" ]
+  grep -qx 'alwaysApply: true' "$mdc"
+  grep -q '^description: ' "$mdc"
+  assert_contains 'bash ~/.claude/habits/bin/habit-tools.sh preload rules' "$(cat "$mdc")"
+  [ "$(jq -r .rules "$REPO_ROOT/.cursor-plugin/plugin.json")" = "./rules/" ]
 }
 
 # --- Fitness 2: hook side effects ---
@@ -167,7 +182,7 @@ dispatcher_cmds() {
 }
 
 named_cmds() {
-  { grep -rhoE 'habit-tools\.sh [a-z][a-z-]*' "$SKILLS"
+  { grep -rhoE 'habit-tools\.sh [a-z][a-z-]*' "$SKILLS" "$REPO_ROOT/rules"
     grep -rhoE 'habit-hook\.sh [a-z][a-z-]*' "$REPO_ROOT"/hooks/*.json; } | awk '{print $2}' | sort -u
 }
 

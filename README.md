@@ -1,7 +1,7 @@
 <div align="center">
   <h1>Habit</h1>
 
-  <p>A <a href="https://code.claude.com/docs/en/plugins">Claude Code</a> plugin that observes how you work and distills reusable prompts from your sessions. Habits are Markdown files with YAML frontmatter: stored locally, version-controllable, executed with semantic overrides. Relevant habits are automatically surfaced when you ask for suggestions.</p>
+  <p>A plugin for <a href="https://code.claude.com/docs/en/plugins">Claude Code</a> and <a href="https://cursor.com">Cursor</a> that learns how you like to work and applies it for you.</p>
 
   <p>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/Prog-Jacob/habit?style=for-the-badge&colorA=1e1e2e&colorB=cba6f7" alt="MIT License" /></a>
@@ -15,108 +15,187 @@
 <span>&nbsp;&middot;&nbsp;</span>
 <a href="#how-it-works">How It Works</a>
 <span>&nbsp;&middot;&nbsp;</span>
+<a href="#privacy">Privacy</a>
+<span>&nbsp;&middot;&nbsp;</span>
 <a href="https://github.com/Prog-Jacob/habit/issues">Report a Bug</a>
 
 <br /><br />
 
 </div>
 
+Habit keeps a local copy of the prompts you type. When you ask, it distills them into _habits_: short standing rules ("never use em dashes") and longer procedures ("review a PR this way"). Rules load into every new session automatically, so you stop repeating yourself. Procedures load when a request needs them. Habits are plain Markdown files that you can read, edit, and commit, and they work the same on both hosts.
+
+## Example
+
+**Before.** You correct the same thing in session after session:
+
+```
+> no em dashes please
+> again, no em dashes, use a period or a colon
+> rewrite that without the dashes
+```
+
+**Distill.** You run `/habit:distill`. It sees the repeated correction and writes one rule:
+
+```markdown
+---
+id: no-dashes
+description: Use periods or colons instead of dashes in prose.
+kind: rule
+---
+
+Never join clauses with an em dash, en dash, or double hyphen. Use a period, comma, colon, or parentheses.
+```
+
+**After.** Every new session starts with that rule already in context. You type nothing extra.
+
+---
+
 ## Install
 
-Requires [jq](https://jqlang.github.io/jq/), and either [Claude Code](https://code.claude.com/docs/en/overview) or [Cursor](https://cursor.com) 2.5+.
+Requires [jq](https://jqlang.github.io/jq/), and [Claude Code](https://code.claude.com/docs/en/overview) or [Cursor](https://cursor.com) 2.5 or later. Install **one copy per machine**.
 
-**Claude Code:**
+| You use | Install |
+| --- | --- |
+| Claude Code | `/plugin marketplace add https://github.com/Prog-Jacob/habit.git`, then `/plugin install habit@habit` |
+| Claude Code and Cursor | Install in Claude Code only. Cursor imports Claude Code plugins, so a second install would load habit twice. |
+| Cursor only | Install habit from Cursor's plugin marketplace. |
 
-```
-/plugin marketplace add https://github.com/Prog-Jacob/habit.git
-/plugin install habit@habit
-```
+Then enable auto-update for the habit marketplace (in Claude Code, open `/plugin` and choose the marketplace). Neither host auto-updates third-party marketplaces by default.
 
-**Cursor (2.5+):** install via Cursor's plugin marketplace, using the manifest in `.cursor-plugin/`. Hook commands in `hooks.cursor.json` are plugin-root-relative, so a marketplace install wires capture with no path edits. If you use both tools, install in Claude Code only: Cursor imports it.
+**Cursor:** a rule shipped with the plugin runs `bash ~/.claude/habits/bin/habit-tools.sh preload rules` at the start of each conversation. Add that command to Cursor's command allowlist so it runs without a prompt.
 
 **Development:** run `claude --plugin-dir .` from a clone.
 
-**Upgrading to 2.2 or later:** Cursor users, run `/habit:distill project` in your active projects first. Claude Code users need no action.
+### Upgrading from 2.x
+
+- **Cursor users on 2.1 or earlier:** before you upgrade, run `/habit:distill project` in each active project. Later versions read only their own inbox, so Cursor sessions that were never distilled are not imported.
+- **Claude Code users:** no action. The first session after an upgrade from 2.1 or earlier backfills the last 30 days of typed prompts from Claude Code's history.
+
+Your habits and learnings carry over. The old `settings.local.json` files stay untouched; `/habit:watch` tells you when they are safe to delete.
 
 ---
 
 ## Usage
 
-Habit captures every prompt you type through hooks. Use Claude Code normally, and run `/habit:distill` from time to time to turn your recent prompts into reusable habits.
+The `/habit:*` forms are Claude Code syntax. On Cursor, call the same skills by name or in plain words (for example, "distill my recent prompts").
 
-The `/habit:*` forms below are Claude Code syntax. On Cursor the same skills are invoked by name or in plain language (for example, ask to run `fix-types` in the auth module, or say "distill my recent prompts").
+**Rules load by themselves.** Each new session gets your active rules, a one-line index of your procedures, and a reminder when distill is due. You do not type anything.
 
-**Create a habit from a description:**
+**Apply procedures to a request:**
 
 ```
-/habit:edit fix-types Fix all TypeScript errors, file by file, using tsc --noEmit
+/habit:suggest review this PR
 ```
 
-**Run it with a scoped override:**
+It picks the procedures that fit, merges them into one instruction, and does the work. Rules already in the session are skipped.
+
+**Run one habit, with an override:**
 
 ```
 /habit fix-types only in the auth module
 ```
 
-Overrides are woven into the instruction semantically ("Fix all TypeScript errors **in the auth module**"), not appended to the end. If you use the same override 3+ times, distill detects the pattern and either creates a variant (`fix-types-auth`) or updates the base habit.
+The override is woven into the instruction ("fix all TypeScript errors **in the auth module**"), not appended. When you give the same override three or more times, distill turns it into a variant or updates the base habit. `/habit` with no id browses the inventory.
 
-**Apply relevant habits to a request:**
-
-```
-/habit:suggest refactor the auth module
-```
-
-Matches habits by tags and descriptions, merges their instructions, and addresses the request directly.
-
-**Browse the inventory:**
+**Distill your prompts:**
 
 ```
-/habit
+/habit:distill            # turn captured prompts into habits
+/habit:distill maintain   # also classify rules and procedures, tighten rules, clean up
+/habit:distill undo       # restore everything the last run changed
 ```
 
-Pick by number or name. Add context to narrow a run (e.g., `1 only in auth`). When the first word is a habit id, `/habit` runs that habit instead of browsing.
+**Watch habit itself:**
+
+```
+/habit:watch              # health report
+/habit:watch off 4        # pause capture for 4 hours (8 by default); /habit:watch on resumes
+/habit:watch snooze 3     # no distill reminder for 3 days (7 by default)
+/habit:watch forget 2     # remove learning number 2
+```
 
 ---
 
 ## Commands
 
-| Command                          | What it does                                                                                                   |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `/habit [query]`                 | Browse and search the inventory. Fuzzy-matches against id, tags, and description.                              |
-| `/habit <id> [override]`         | Run a habit. The override changes the instruction for this run and is logged.                                  |
-| `/habit:edit <id> [description]` | Create, update, or delete a habit. Without a description, shows current content.                               |
-| `/habit:suggest <request>`       | Surface relevant habits for a request, merge their instructions, and address it directly.                      |
-| `/habit:distill`                 | Turn captured prompts from every project into habits. Classifies, deduplicates, writes or merges habits.       |
-| `/habit:distill maintain`        | Regular sweep plus full inventory restructure: merge convergent habits, normalize tags, archive stale entries. |
-| `/habit:distill undo`            | Undo the last distill run and queue its prompts again.                                                         |
-| `/habit:watch`                   | Show status: installed copies, capture per host, the backlog, whether distill is due, learnings, integrity.    |
-| `/habit:watch off [hours]`       | Pause capture on every session for 8 hours, or the given hours. `/habit:watch on` resumes it.                  |
-| `/habit:watch snooze [days]`     | Silence the daily distill reminder for 7 days, or the given days.                                              |
+| Command | What it does |
+| --- | --- |
+| `/habit [query]` | Browse and search the inventory by id, tags, and description. |
+| `/habit <id> [override]` | Run one habit. The override changes this run only and is logged. |
+| `/habit:suggest <request>` | Apply the relevant procedures (and any rules not loaded) to a request. |
+| `/habit:edit <id> [change]` | Create, update, or delete a habit in plain words. You can also set its kind. |
+| `/habit:distill` | Turn captured prompts from every project into new or merged habits. |
+| `/habit:distill maintain` | Distill, then classify every habit as a rule or a procedure, rewrite rules to be terse, archive habits your `CLAUDE.md`, `AGENTS.md`, or memory already states, merge duplicates, and archive stale procedures. |
+| `/habit:distill undo` | Undo the last distill run and queue its prompts again. An undo can itself be undone. |
+| `/habit:watch [status]` | Show installed copies, capture per host, the backlog, the last distill, habit counts, the rule budget, learnings, and integrity checks. |
+| `/habit:watch off [hours]` / `on` | Pause capture everywhere for 8 hours or the given hours, or resume it. |
+| `/habit:watch snooze [days]` | Silence the distill reminder for 7 days or the given days. |
+| `/habit:watch forget <n>` | Remove a learning by its number. |
 
 ---
 
 ## How It Works
 
-**Hooks.** Each prompt you type is copied into a local inbox in `~/.claude/habits/inbox/`, from every project and both hosts. Short replies keep a snippet of the assistant message they answered, and common secret patterns are redacted. `SessionStart` keeps a fixed CLI path at `~/.claude/habits/bin/habit-tools.sh` up to date. When at least 30 prompts wait and the oldest is a week old (or 300 wait), a new session shows one reminder a day to run `/habit:distill` (Cursor shows it before compacting the context).
+**Capture.** A prompt hook copies each prompt you type into a local inbox, from every project and both hosts. Slash commands are stripped and prompts under three words are dropped. A short reply also keeps the last 300 characters of the assistant message it answered, so "yes, and no hyphens either" still makes sense later.
 
-**Distill** runs in a forked subagent. It claims the inbox, groups the prompts by project, classifies each one as reusable or one-off, deduplicates against existing habits, and writes new or merged entries. `maintain` adds a full restructure pass: merging convergent habits, normalizing tags, and archiving stale entries. Every run takes a snapshot first, so `/habit:distill undo` restores the habits and queues the prompts again.
+**Inbox.** One file per session in `~/.claude/habits/inbox/`. Distill claims the files by moving them, so new prompts never collide with a running distill.
 
-**Self-improvement.** When your prompts show friction with habit itself, distill writes a _learning_: a short standing note aimed at the skill it concerns. Each skill applies its learnings on the next run. `/habit:watch` lists them and can forget any of them. Learnings live in your data directory, so they survive updates and behave the same on Claude Code and Cursor.
+**Distill.** You start it; it never runs on its own. It groups the prompts by project, keeps the ones that describe how you work, skips anything your existing habits or your `CLAUDE.md`, `AGENTS.md`, or memory already cover, and writes new or merged habits. Every run takes a snapshot first, so `/habit:distill undo` restores the habits and learnings and queues the prompts again.
 
-**Scope.** Habits live in `~/.claude/habits/` (global) or `.claude/habits/` (project). Project habits shadow global ones with the same id.
+**Rules injection.** A habit has `kind: rule` or `kind: procedure` (missing means procedure). A rule body is at most 600 characters, about 300 after `maintain`. At session start, habit loads your active rules: global rules first, then the current project's rules, which win a conflict. The block stays under 8,000 characters. Project rules get the space first, and any rule that does not fit is listed by id so it can still be loaded on demand. Claude Code gets the block from the session start hook. Cursor gets it through the plugin's always-on rule.
 
-**Storage.** Each habit is a `.md` file. Project directories hold only habit files, so they can be committed. The inbox, usage log, learnings, and snapshots stay in `~/.claude/habits/`.
+**Notices.** When at least 30 prompts wait and the oldest is a week old (or 300 wait), a new session shows one reminder a day to run `/habit:distill`. Cursor shows it before compacting the context, and both hosts see it in the rules block.
+
+**Learnings.** When your prompts show friction with habit itself, distill writes a learning: a short note aimed at the skill concerned, which that skill applies on its next run. `/habit:watch` lists them and can forget any of them.
+
+**Scope.** Habits live in `~/.claude/habits/` (global) or `<repo>/.claude/habits/` (project). A project habit replaces a global one with the same id.
+
+---
+
+## Privacy
+
+- The inbox stays on your machine. Habit itself makes no network calls.
+- Inbox files are created with mode 600, readable only by you.
+- Common secrets are replaced with `[redacted]` before anything is written: API keys (`sk-`, `ghp_`, `github_pat_`, `xox?-`, `AKIA`), private key blocks, and `password=`, `secret=`, `token=` values.
+- `/habit:watch off` pauses capture on every session until it expires.
+- Prompts from finished distill runs are deleted after 90 days.
+
+---
+
+## Platforms
+
+macOS and Linux. Windows through WSL only. Habit needs only bash 3.2 or later and jq.
+
+---
+
+## Storage
+
+```
+~/.claude/habits/
+  *.md                      global habits
+  learnings.jsonl           learnings (append only)
+  log/YYYY-MM.jsonl         usage log, kept 6 months
+  inbox/<host>-<sid>.jsonl  captured prompts; .claimed/ and .done/ hold distill runs
+  snapshots/<run>.tar.gz    the last 10 snapshots, for undo
+  bin/habit-tools.sh        fixed CLI path, kept pointing at the newest install
+  paused, nudge.next        capture pause and reminder times
+  .v3                       data version marker
+<repo>/.claude/habits/*.md  project habits, safe to commit
+```
+
+A habit file:
 
 ```markdown
 ---
 id: fix-types
-tags: [typescript, linting]
-description: Fix TypeScript type errors in the specified scope.
+tags: [typescript]
+description: Fix TypeScript errors in the specified scope.
 scope: global
 created: 2026-04-09T14:30:00Z
 updated: 2026-04-09T14:30:00Z
 archived: false
-last_executed: 2026-04-11T18:14:28Z
+kind: procedure
 ---
 
 ## Instruction
@@ -133,7 +212,7 @@ Prefer narrowing types over adding `as` casts.
 /plugin uninstall habit@habit
 ```
 
-Habit data in `~/.claude/habits/` is preserved. To delete it:
+Your data in `~/.claude/habits/` is kept. To delete it:
 
 ```sh
 rm -rf ~/.claude/habits/

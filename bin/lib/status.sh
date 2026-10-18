@@ -1,8 +1,6 @@
 # status.sh: One health report for the watch skill and the CLI. Prints every
 # section, then returns 1 when an integrity check failed.
 
-STATUS_RULE_BUDGET=8000
-
 # Epoch mtime of a file (GNU stat, then BSD stat).
 _mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null; }
 
@@ -122,7 +120,7 @@ _status_habits() {
     [ -n "$p" ] || continue
     chars=$((chars + $(awk 'n >= 2 { print } /^---$/ { n++ }' "$p" | wc -m)))
   done < <(jq -nr --arg rows "$rows" "$INDEX_JQ_DEFS"'rows | select(valid and .archived != "true" and .kind == "rule") | .path')
-  echo "Rule budget: $chars/$STATUS_RULE_BUDGET chars"
+  echo "Rule budget: $chars/$RULES_BUDGET chars"
 }
 
 _status_learnings() {

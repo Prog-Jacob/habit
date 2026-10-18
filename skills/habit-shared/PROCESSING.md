@@ -30,22 +30,32 @@ A prompt is **one-off** if it:
 - Is a one-time action ("fix the typo on line 42")
 - Is a tool bug or temporary issue unrelated to how the user works
 
-## 3. Deduplication
+## 3. Kind
+
+Each habit has a `kind` in its frontmatter; give every habit you create or rewrite one. A missing kind means `procedure`.
+
+- **rule:** a standing preference that should hold in every session and fits in a few sentences. Every session loads the active rules automatically, so a rule body is the rule itself: plain text with no heading, about 300 characters, never more than 600 (`write-habit` rejects a longer one).
+- **procedure:** a workflow the user runs on demand, or anything that needs steps or long detail. Procedures load only when a request calls for them.
+
+A rule that needs long detail is a procedure. Interpretation applies to rules too, but a rule stays terse instead of growing into steps. The user can set any habit back to `procedure`.
+
+## 4. Deduplication
 
 Compare new candidate against the preloaded index (descriptions + tags) by intent, not wording. Only load full content via `read-habit <id>` when two habits look close enough that the description alone cannot distinguish them.
 
 - **Skip:** Candidate and existing habit would produce the same agent behavior. Only wording differs. Note in the summary that it's already covered.
 - **Merge:** Candidate adds steps or context the existing habit lacks, but they target the same workflow. Preserve intent from both. Keep the id. Update `updated` timestamp.
 - **Create new:** Candidate targets a different workflow, even if it shares the same domain.
+- **Covered elsewhere:** The user already states the candidate in an instruction file they keep (`CLAUDE.md`, `AGENTS.md`, or a memory index). Skip it and note in the summary where it is covered.
 
-## 4. Override Patterns
+## 5. Override Patterns
 
 From the usage log: group by id, collect the non-empty notes (each is an override the user gave when running the habit), normalize (lowercase, trim). **3+ similar = pattern:**
 
 - Scope-narrowing → create variant (e.g., `fix-types-auth`).
 - Behavior-adding → update base habit.
 
-## 5. Scope Detection
+## 6. Scope Detection
 
 - References relative paths, project scripts, or project config → `project` (the project the prompt came from)
 - Generic → `global` → `~/.claude/habits/`

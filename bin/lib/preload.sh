@@ -24,13 +24,15 @@ cmd_preload() {
       _section PROCESSING _shared_doc PROCESSING.md
       ;;
     watch) ( cmd_status ) 2>&1 || true ;;
+    rules) rules_preload ;;
     distill)
       _section LEARNINGS cmd_read_learnings distill
       _section INDEX cmd_read_index merged
       _section LOG _recent_log
+      _section CONTEXT cmd_context_files
       _section PROCESSING _shared_doc PROCESSING.md
       _section OPERATIONS _shared_doc OPERATIONS.md
       ;;
-    *) echo "Usage: preload <habit|suggest|edit|watch|distill>" >&2; exit 1 ;;
+    *) echo "Usage: preload <habit|suggest|edit|watch|distill|rules>" >&2; exit 1 ;;
   esac
 }

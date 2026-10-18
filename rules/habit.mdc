@@ -1,0 +1,6 @@
+---
+description: Load the user's standing rules from habit once per conversation.
+alwaysApply: true
+---
+
+At the start of a conversation, run `bash ~/.claude/habits/bin/habit-tools.sh preload rules` once and follow its output for the rest of the conversation. If the command is missing or fails, continue silently.

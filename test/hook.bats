@@ -90,11 +90,15 @@ ss() { # ss <home> <payload>: the session-start hook from <home>
   assert_contains "/habit:distill" "${output##*|}"
   [ "$(cat "$g/nudge.next")" -ge $((before + 86400)) ]
   [ "$(cat "$g/nudge.next")" -le $(( $(date +%s) + 86400 )) ]
+  # Throttled: the rules context keeps its due line, but no notice and no ask.
   run ss "$h" '{"session_id":"s2","source":"startup"}'
-  [ "$status" -eq 0 ] && [ -z "$output" ]
+  [ "$status" -eq 0 ]
+  [ "$(jq -r 'has("systemMessage")' <<< "$output")" = false ]
+  assert_contains "habit: 40 prompts across 2 projects" "$output"
+  refute_contains "Mention once" "$output"
 }
 
-@test "session-start prints nothing for Cursor, when not due, or when snoozed" {
+@test "session-start prints nothing for Cursor or when not due, and no notice when snoozed" {
   local h g
   h=$(new_home ssquiet); g="$h/.claude/habits"
   touch "$g/.v3"
@@ -106,6 +110,8 @@ ss() { # ss <home> <payload>: the session-start hook from <home>
   [ -z "$output" ] && [ ! -e "$g/nudge.next" ]
   (cd "$h" && HOME="$h" bash "$TOOLS" watch snooze 2) >/dev/null
   run ss "$h" '{"session_id":"s1"}'
+  refute_contains "systemMessage" "$output"
+  run ss "$h" '{"session_id":"s1","source":"resume"}'
   [ -z "$output" ]
   [ "$(cat "$g/nudge.next")" -gt $(( $(date +%s) + 86400 )) ]
 }

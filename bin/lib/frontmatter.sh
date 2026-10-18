@@ -1,11 +1,11 @@
 # frontmatter.sh: YAML frontmatter parsing for write-habit validation.
 
 # Single-pass parse: sets fm_id, fm_tags, fm_description, fm_scope,
-# fm_created, fm_updated, fm_archived, fm_last_executed as shell variables.
+# fm_created, fm_updated, fm_archived, fm_last_executed, fm_kind as shell variables.
 parse_frontmatter() {
   local file="$1"
   fm_id="" fm_tags="" fm_description="" fm_scope=""
-  fm_created="" fm_updated="" fm_archived="" fm_last_executed=""
+  fm_created="" fm_updated="" fm_archived="" fm_last_executed="" fm_kind=""
   local in_front=0
   while IFS= read -r line; do
     if [ "$line" = "---" ]; then
@@ -26,6 +26,7 @@ parse_frontmatter() {
       updated) fm_updated="$val" ;;
       archived) fm_archived="$val" ;;
       last_executed) fm_last_executed="$val" ;;
+      kind) fm_kind="$val" ;;
     esac
   done < "$file"
 }

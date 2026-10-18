@@ -175,7 +175,7 @@ shim_target() { sed -n 's/^exec bash "\(.*\)" "\$@"$/\1/p' "$1"; }
 @test "session-start writes an executable shim to this copy, migrates, and prints nothing" {
   local h
   h=$(new_home ss)
-  run bash -c "echo '{\"session_id\":\"x\"}' | HOME='$h' bash '$TOOLS' session-start"
+  run bash -c "cd '$h' && echo '{\"session_id\":\"x\"}' | HOME='$h' bash '$TOOLS' session-start"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
   local shim="$h/.claude/habits/bin/habit-tools.sh"
@@ -199,25 +199,25 @@ shim_target() { sed -n 's/^exec bash "\(.*\)" "\$@"$/\1/p' "$1"; }
   fake="$BATS_TEST_TMPDIR/fake/bin/habit-tools.sh"
   mkdir -p "$(dirname "$fake")" "$(dirname "$shim")"
   touch "$fake"
-  for v in 99.0.0 2.10.0; do
+  for v in 99.0.0 3.10.0; do
     printf '#!/bin/bash\n# habit-shim %s\nexec bash "%s" "$@"\n' "$v" "$fake" > "$shim"
-    echo '{}' | HOME="$h" bash "$TOOLS" session-start
+    (cd "$h" && echo '{}' | HOME="$h" bash "$TOOLS" session-start)
     [ "$(shim_target "$shim")" = "$fake" ]
   done
   for v in 0.9.9 "$(jq -r .version "$REPO_ROOT/.claude-plugin/plugin.json")" banana 2.1; do
     printf '#!/bin/bash\n# habit-shim %s\nexec bash "%s" "$@"\n' "$v" "$fake" > "$shim"
-    echo '{}' | HOME="$h" bash "$TOOLS" session-start
+    (cd "$h" && echo '{}' | HOME="$h" bash "$TOOLS" session-start)
     [ "$(shim_target "$shim")" = "$ours" ]
   done
   printf '#!/bin/bash\n# habit-shim 99.0.0\nexec bash "%s" "$@"\n' "$BATS_TEST_TMPDIR/gone/bin/habit-tools.sh" > "$shim"
-  echo '{}' | HOME="$h" bash "$TOOLS" session-start
+  (cd "$h" && echo '{}' | HOME="$h" bash "$TOOLS" session-start)
   [ "$(shim_target "$shim")" = "$ours" ]
 }
 
 @test "hook session-start routes to the CLI and prints nothing" {
   local h
   h=$(new_home ss3)
-  run bash -c "echo '{\"session_id\":\"x\"}' | HOME='$h' bash '$HOOK' session-start"
+  run bash -c "cd '$h' && echo '{\"session_id\":\"x\"}' | HOME='$h' bash '$HOOK' session-start"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
   [ -f "$h/.claude/habits/bin/habit-tools.sh" ]

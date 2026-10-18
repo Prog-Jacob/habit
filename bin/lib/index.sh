@@ -1,7 +1,8 @@
 # index.sh: Habit index derived from the *.md frontmatter on every read.
 
 # One awk pass over the global and project habit files. One \037-joined row per
-# file: scope path stem id tags description created updated archived last_executed kind
+# file: scope path stem id tags description created updated archived last_executed
+# kind body, where body is kept for rules only, its lines joined by \035.
 _index_rows() {
   local pdir="${1:-}" f
   local files=()
@@ -16,11 +17,11 @@ _index_rows() {
       s = (index(file, g) == 1) ? "global" : "project"
       stem = file; sub(/.*\//, "", stem); sub(/\.md$/, "", stem)
       print s "\037" file "\037" stem "\037" v["id"] "\037" v["tags"] "\037" v["description"] "\037" \
-        v["created"] "\037" v["updated"] "\037" v["archived"] "\037" v["last_executed"] "\037" v["kind"]
+        v["created"] "\037" v["updated"] "\037" v["archived"] "\037" v["last_executed"] "\037" v["kind"] "\037" body
     }
-    FNR == 1 { emit(); file = FILENAME; n = 0; split("", v) }
+    FNR == 1 { emit(); file = FILENAME; n = 0; body = ""; split("", v) }
     { sub(/\r$/, "") }
-    n >= 2 { next }
+    n >= 2 { if (v["kind"] == "rule") body = body $0 "\035"; next }
     $0 == "---" { n++; next }
     n == 1 { k = $0; sub(/:.*/, "", k); val = $0; sub(/^[^:]*:/, "", val); sub(/^ +/, "", val); v[k] = val }
     END { emit() }
@@ -30,7 +31,7 @@ _index_rows() {
 INDEX_JQ_DEFS='
 def rows: $rows | split("\n")[] | select(length > 0) | split("\u001f")
   | {scope: .[0], path: .[1], stem: .[2], id: .[3], tags: .[4], description: .[5],
-     created: .[6], updated: .[7], archived: .[8], le: .[9], kind: .[10]};
+     created: .[6], updated: .[7], archived: .[8], le: .[9], kind: .[10], body: (.[11] // "")};
 def valid: .id != "" and .id == .stem and .description != "";
 '
 
@@ -59,7 +60,7 @@ cmd_read_index() {
          | $p + ($all | map(select(.scope == "global" and (.id as $i | any($pids[]; . == $i) | not))))
        end)
     | sort_by(.id)
-    | if $mode == "active" then map(select(.archived != true) | {id, tags, description, scope}) else . end
+    | if $mode == "active" then map(select(.archived != true) | {id, tags, description, scope} + (if .kind then {kind} else {} end)) else . end
     | {entries: .}'
 }
 

@@ -2,6 +2,8 @@
 
 GLOBAL_DIR="$HOME/.claude/habits"
 INBOX_CAP=400
+RULE_BODY_MAX=600
+RULES_BUDGET=8000
 
 require_jq() {
   command -v jq &>/dev/null || { echo "Error: jq is required but not installed" >&2; exit 1; }
