@@ -1,7 +1,7 @@
 {
   "name": "habit",
   "version": "3.0.0",
-  "description": "Intelligent prompt inventory. Observes, captures, and evolves reusable prompts into a living collection.",
+  "description": "Learns how you like to work from the prompts you type, and applies it in every session.",
   "author": {
     "name": "prog-jacob"
   },
