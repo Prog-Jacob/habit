@@ -2,7 +2,7 @@
 # Dependency-free: relies only on bats core (run/$status/$output) plus the two
 # substring assertions below, which mirror the suite's dominant grep -qF idiom.
 
-REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd -P)"
 TOOLS="$REPO_ROOT/bin/habit-tools.sh"
 HOOK="$REPO_ROOT/hooks/habit-hook.sh"
 
@@ -21,22 +21,27 @@ refute_contains() {
   fi
 }
 
-# Source the library layer with GLOBAL_DIR/PROJECT_DIR pointed at scratch dirs.
-# common.sh seeds those from $HOME at source time, so we override afterwards.
+# Source the library layer with GLOBAL_DIR pointed at a scratch dir. common.sh
+# seeds it from $HOME at source time, so we override afterwards. The project
+# scope resolves through HABIT_PROJECT_DIR (set by seed_fixtures).
 source_libs() {
   source "$REPO_ROOT/bin/lib/common.sh"
-  source "$REPO_ROOT/bin/lib/state.sh"
   source "$REPO_ROOT/bin/lib/frontmatter.sh"
   GLOBAL_DIR="$TEST_GLOBAL"
-  PROJECT_DIR="$TEST_PROJECT"
+  source "$REPO_ROOT/bin/lib/project.sh"
+  source "$REPO_ROOT/bin/lib/usage-log.sh"
+  source "$REPO_ROOT/bin/lib/index.sh"
   source "$REPO_ROOT/bin/lib/habit.sh"
 }
 
-# Write the canonical fixture set: three global habits (one archived), a global
-# index over them, and a single project habit with its own state.
+# Write the canonical fixture set: three global habits (one archived) and a
+# single project habit.
 seed_fixtures() {
   TEST_GLOBAL="$(mktemp -d)"
-  TEST_PROJECT="$(mktemp -d)"
+  TEST_PROJECT_ROOT="$(cd "$(mktemp -d)" && pwd -P)"
+  TEST_PROJECT="$TEST_PROJECT_ROOT/.claude/habits"
+  mkdir -p "$TEST_PROJECT"
+  export HABIT_PROJECT_DIR="$TEST_PROJECT_ROOT"
 
   _write_habit "$TEST_GLOBAL/cleanup-writing.md" cleanup-writing \
     "[writing, quality]" "Replace em dashes with natural punctuation." global false "Fix dashes."
@@ -45,37 +50,26 @@ seed_fixtures() {
   _write_habit "$TEST_GLOBAL/smart-tests.md" smart-tests \
     "[testing, quality]" "Write focused tests." global false "Test well."
 
-  cat > "$TEST_GLOBAL/settings.local.json" << 'JSON'
-{
-  "index": [
-    {"id": "cleanup-writing", "tags": ["writing","quality"], "description": "Replace em dashes.", "scope": "global", "archived": false},
-    {"id": "old-habit", "tags": ["deprecated"], "description": "Archived.", "scope": "global", "archived": true},
-    {"id": "smart-tests", "tags": ["testing","quality"], "description": "Write focused tests.", "scope": "global", "archived": false}
-  ],
-  "meta": {"update_counter": 5, "last_deep_timestamp": null},
-  "log": [],
-  "sessions": {},
-  "observations": []
-}
-JSON
-
   _write_habit "$TEST_PROJECT/project-habit.md" project-habit \
     "[project]" "Project only." project false "Project specific."
-  cat > "$TEST_PROJECT/settings.local.json" << 'JSON'
-{
-  "index": [
-    {"id": "project-habit", "tags": ["project"], "description": "Project only.", "scope": "project", "archived": false}
-  ],
-  "meta": {"update_counter": 0, "last_deep_timestamp": null},
-  "log": [],
-  "sessions": {},
-  "observations": []
-}
-JSON
 }
 
 teardown_fixtures() {
-  rm -rf "$TEST_GLOBAL" "$TEST_PROJECT"
+  rm -rf "$TEST_GLOBAL" "$TEST_PROJECT_ROOT"
+}
+
+# A scratch HOME with an empty global habits dir. Prints its path.
+new_home() {
+  local h="$BATS_TEST_TMPDIR/${1:-home}"
+  mkdir -p "$h/.claude/habits"
+  echo "$h"
+}
+
+# Run the CLI with HOME=<home> from <cwd>: hx <home> <cwd> <args...>
+hx() {
+  local h="$1" cwd="$2"
+  shift 2
+  (cd "$cwd" && HOME="$h" bash "$TOOLS" "$@")
 }
 
 # _write_habit <path> <id> <tags> <description> <scope> <archived> <body>
@@ -96,7 +90,3 @@ archived: $6
 $7
 EOF
 }
-
-# Slugify a workspace path the way the tools do (leading slash stripped,
-# remaining slashes to dashes).
-slugify() { echo "${1#/}" | tr '/' '-'; }

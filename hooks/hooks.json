@@ -1,35 +1,22 @@
 {
-  "description": "Habit session lifecycle hooks. Writes a session breadcrumb on start, clears it on end, counts prompts in between.",
+  "description": "Habit hooks. SessionStart writes the CLI shim and migrates once. UserPromptSubmit captures each prompt into the local inbox.",
   "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh prompt-tick",
-            "async": true
-          }
-        ]
-      }
-    ],
     "SessionStart": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh session-init",
-            "async": true
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh session-start"
           }
         ]
       }
     ],
-    "SessionEnd": [
+    "UserPromptSubmit": [
       {
-        "matcher": "clear|logout|prompt_input_exit",
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh session-end",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/habit-hook.sh capture",
             "async": true
           }
         ]

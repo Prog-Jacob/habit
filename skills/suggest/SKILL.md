@@ -5,24 +5,19 @@ argument-hint: "<request>"
 allowed-tools: Bash(bash:*)
 ---
 
-# Habit Suggest: Surface & Apply
+# Habit Suggest: Surface and Apply
 
 ## Preload
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh skill-preload suggest ${CLAUDE_SESSION_ID}`
-
-Run this Setup block once and reuse the values below:
+Run this once before anything else:
 
 ```bash
-HABIT_SID_FILE=$(ls -t "$HOME/.claude/habits/sessions.d/"* 2>/dev/null | head -1)
-source "${HABIT_SID_FILE:-$HOME/.claude/habits/current}" 2>/dev/null
-HABIT_BIN="${HABIT_BIN:-$(command -v habit-tools.sh || echo "${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/habit-tools.sh}")}"
-[ -f "${HABIT_BIN:-}" ] || echo "HABIT_UNAVAILABLE: habit is not wired on this host."
+bash ~/.claude/habits/bin/habit-tools.sh preload suggest
 ```
 
-If it printed `HABIT_UNAVAILABLE`, tell the user habit is not installed or its hooks are not wired, then stop. Otherwise, if no preload output appears above (hosts without harness-time injection, e.g. Cursor), run `bash "$HABIT_BIN" skill-preload suggest "$HABIT_SID"` once.
+If the command is missing, tell the user habit's hooks have not run yet and to start a new session, then stop.
 
-The output has delimited sections: `===LEARNINGS===` (apply each note silently as standing guidance for this skill when you reach the step it bears on; never print, quote, summarize, or mention them to the user), `===TRIGGERS===` (show the message only if non-empty), `===INDEX===` (the merged active index, used directly below).
+The output has two sections: `===LEARNINGS===` (standing guidance for this skill: apply each note silently when you reach the step it bears on; never print, quote, summarize, or mention them) and `===INDEX===` (the active habits).
 
 ## Instructions
 
@@ -31,16 +26,12 @@ The output has delimited sections: `===LEARNINGS===` (apply each note silently a
 3. If none are relevant, address the request directly without ceremony.
 4. Load all relevant habits in one call:
    ```bash
-   bash "$HABIT_BIN" read-habit <id1> <id2> ...
+   bash ~/.claude/habits/bin/habit-tools.sh read-habit <id1> <id2> ...
    ```
    Output is delimited by `---HABIT:<id>---`. Each section starts with `SCOPE:<scope>`. Note the scope per habit. Extract the instruction body after the frontmatter.
 5. Merge into a single directive. Where two conflict, the more narrowly scoped wins. Synthesize one coherent action, do not run them sequentially.
-6. Execute the merged directive. Only after it fails to apply because a tool or path it required was missing (not one it was meant to create) should you log it once before falling back:
+6. Execute the merged directive. Do not announce which habits are applied or describe internal operations.
+7. After execution, log all applied habits in one call, with no note:
    ```bash
-   bash "$HABIT_BIN" log-observation "$HABIT_SID" 'suggested habits require a missing tool or input path: <detail>'
-   ```
-   Do not announce which habits are applied or describe internal operations.
-7. After execution, log all applied habits in one call:
-   ```bash
-   bash "$HABIT_BIN" log-exec '[{"scope":"<scope>","id":"<id>","override":"<request summary, max 80 chars>"}, ...]'
+   bash ~/.claude/habits/bin/habit-tools.sh log-exec '[{"scope":"<scope>","id":"<id>"}, ...]' ${CLAUDE_SESSION_ID}
    ```

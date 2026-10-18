@@ -1,56 +1,31 @@
 ---
 name: habit-watch
-description: "Use when the user wants to check, pause, or resume automatic habit capture. Triggers on: watch status, stop watching, pause capture, resume capture."
-argument-hint: "[start|stop|status]"
+description: "Use when the user wants to check, pause, or resume prompt capture, or see and remove what habit has learned about its own skills. Triggers on: watch status, stop watching, pause capture, resume capture, list learnings, forget a learning."
+argument-hint: "[off [hours] | on | learnings | forget <n>]"
 allowed-tools: Bash(bash:*)
 disable-model-invocation: true
 ---
 
-# Habit Watch: Observation Control
+# Habit Watch: Capture Control
 
-Watch is always active by default. This skill lets you check status, pause, or resume. Capture control is deliberately static: watch has no learnings overlay, by design.
+Capture is on by default: each prompt goes to a local inbox that the distill habit reads. Watch has no learnings overlay, by design.
 
 ## Preload
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh skill-preload watch ${CLAUDE_SESSION_ID}`
-
-Run this Setup block once and reuse the values below:
+Run this once before anything else:
 
 ```bash
-HABIT_SID_FILE=$(ls -t "$HOME/.claude/habits/sessions.d/"* 2>/dev/null | head -1)
-source "${HABIT_SID_FILE:-$HOME/.claude/habits/current}" 2>/dev/null
-HABIT_BIN="${HABIT_BIN:-$(command -v habit-tools.sh || echo "${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/habit-tools.sh}")}"
-[ -f "${HABIT_BIN:-}" ] || echo "HABIT_UNAVAILABLE: habit is not wired on this host."
+bash ~/.claude/habits/bin/habit-tools.sh preload watch
 ```
 
-If it printed `HABIT_UNAVAILABLE`, tell the user habit is not installed or its hooks are not wired, then stop. Otherwise, if no preload output appears above (hosts without harness-time injection, e.g. Cursor), run `bash "$HABIT_BIN" skill-preload watch "$HABIT_SID"` once.
+If the command is missing, tell the user habit's hooks have not run yet and to start a new session, then stop.
 
-The output has a `===TRIGGERS===` section: show the message only if non-empty.
-
-## Resolve state
-
-Run these and use the outputs (`ACTIVE` or `PAUSED`, then the count):
-
-```bash
-bash "$HABIT_BIN" watch status "$HABIT_SID"
-bash "$HABIT_BIN" read-prompt-count "$HABIT_SID"
-```
+The output is the capture state (`ACTIVE`, or `PAUSED until` a local time), the prompts waiting for distill, and the last capture time.
 
 ## Routing
 
-1. Message empty, "status", or "resume" go to Status/Resume.
-2. Message intends deactivation (off, stop, disable, pause, turn off) go to Pause.
-3. Otherwise go to Status/Resume.
-
-## Status/Resume
-
-1. If `ACTIVE`: count 0 says "Watch is active. No prompts captured yet this session.", else "Watch is active. {count} prompts captured this session." Include the triggers message if non-empty. Stop.
-2. Resume: `bash "$HABIT_BIN" watch start "$HABIT_SID"`
-3. Confirm: "Watch resumed."
-
-## Pause
-
-1. If `PAUSED`: "Watch is already paused." Stop.
-2. Pause: `bash "$HABIT_BIN" watch stop "$HABIT_SID"`
-3. If count > 0, suggest running the distill habit to process this session.
-4. Confirm: "Watch paused. Run the watch habit to resume."
+1. Pause intent (off, stop, pause, disable), with optional hours: run `bash ~/.claude/habits/bin/habit-tools.sh watch off [hours]` (8 hours when none are given). Confirm when capture resumes on its own.
+2. Resume intent (on, start, resume): run `bash ~/.claude/habits/bin/habit-tools.sh watch on`. Confirm "Capture resumed."
+3. Learnings intent (learnings, what have you learned): run `bash ~/.claude/habits/bin/habit-tools.sh list-learnings`. Show the numbered list as is, or say there are none. Mention that "forget <n>" removes one.
+4. Forget intent with a number: run `bash ~/.claude/habits/bin/habit-tools.sh forget-learning <n>`, then show the list again.
+5. Otherwise report the preloaded state in one or two plain sentences. If prompts are waiting, mention that the distill habit turns them into habits.

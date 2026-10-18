@@ -1,130 +1,139 @@
 #!/usr/bin/env bats
-# Integration tests: CLI end to end, breadcrumbs, session discovery, install
-# linking, learnings store, env detection, and robustness against corrupt
-# inputs. Hook-adapter tests live in hook.bats.
+# Integration tests: the CLI end to end for preload, watch, learnings, and
+# env detection. Hook routing lives in hook.bats and static.bats.
 
 load test_helper
 
-@test "list-new-sessions finds a Cursor session with no Claude Code project dir" {
-  local home="$BATS_TEST_TMPDIR/lns"
-  mkdir -p "$home/.claude/habits"
-  local ws="$home/work"
-  mkdir -p "$ws"
-  local cur="$home/.cursor/projects/$(slugify "$ws")/agent-transcripts/abc123"
-  mkdir -p "$cur"
-  echo '{"role":"user","message":{"content":[{"type":"text","text":"<user_query>hi there</user_query>"}]}}' > "$cur/abc123.jsonl"
-  run bash -c "cd '$ws' && HOME='$home' bash '$TOOLS' list-new-sessions"
-  assert_contains "abc123.jsonl" "$output"
-  refute_contains "/.." "$output"
-}
+# --- preload ---
 
-@test "write_breadcrumb records HABIT_BIN and HABIT_SID per session and in current" {
-  local bc="$BATS_TEST_TMPDIR/bc"
-  mkdir -p "$bc"
-  bash -c "
-    source '$REPO_ROOT/bin/lib/common.sh'
-    source '$REPO_ROOT/bin/lib/state.sh'
-    GLOBAL_DIR='$bc'
-    SCRIPT_DIR='$REPO_ROOT/bin'
-    write_breadcrumb 'sess-123'
-  "
-  run cat "$bc/current"
-  assert_contains "HABIT_SID=sess-123" "$output"
-  assert_contains "HABIT_BIN=$REPO_ROOT/bin/habit-tools.sh" "$output"
-  run cat "$bc/sessions.d/sess-123"
-  assert_contains "HABIT_SID=sess-123" "$output"
-}
+# sections <output>: the ===NAME=== headers in order, space separated.
+sections() { echo "$1" | sed -n 's/^===\([A-Z]*\)===$/\1/p' | tr '\n' ' '; }
 
-@test "clear_breadcrumb removes only its own session file and a matching current" {
-  local bc="$BATS_TEST_TMPDIR/bc2"
-  mkdir -p "$bc/sessions.d"
-  printf 'HABIT_SID=x\n' > "$bc/sessions.d/x"
-  printf 'HABIT_SID=y\n' > "$bc/sessions.d/y"
-  printf 'HABIT_SID=y\n' > "$bc/current"
-  bash -c "source '$REPO_ROOT/bin/lib/common.sh'; GLOBAL_DIR='$bc'; clear_breadcrumb x"
-  [ ! -f "$bc/sessions.d/x" ]
-  [ -f "$bc/sessions.d/y" ]
-  [ -f "$bc/current" ]
-  bash -c "source '$REPO_ROOT/bin/lib/common.sh'; GLOBAL_DIR='$bc'; clear_breadcrumb y"
-  [ ! -f "$bc/sessions.d/y" ]
-  [ ! -f "$bc/current" ]
-}
+@test "preload emits the sections each skill reads" {
+  local h
+  h=$(new_home pl)
+  touch "$h/.claude/habits/.v3"
+  _write_habit "$h/.claude/habits/alpha.md" alpha "[a]" "Alpha habit." global false "A."
+  _write_habit "$h/.claude/habits/gone.md" gone "[g]" "Archived habit." global true "G."
+  hx "$h" "$h" write-learning suggest "prefer narrow habits" >/dev/null
+  hx "$h" "$h" log-exec '[{"scope":"global","id":"alpha"}]' sid-1 >/dev/null
 
-@test "distill-preload emits every section and reads the shared docs" {
-  local home="$BATS_TEST_TMPDIR/dp"
-  mkdir -p "$home/.claude/habits"
-  run bash -c "HOME='$home' bash '$TOOLS' distill-preload ''"
-  assert_contains "===TRANSCRIPT===" "$output"
-  assert_contains "===OPERATIONS===" "$output"
+  run hx "$h" "$h" preload suggest
+  [ "$(sections "$output")" = "LEARNINGS INDEX " ]
+  assert_contains "prefer narrow habits" "$output"
+  assert_contains '"alpha"' "$output"
+  refute_contains '"gone"' "$output"
+
+  run hx "$h" "$h" preload habit
+  [ "$(sections "$output")" = "LEARNINGS INDEX " ]
+  refute_contains "prefer narrow habits" "$output"
+
+  run hx "$h" "$h" preload edit
+  [ "$(sections "$output")" = "LEARNINGS PROCESSING " ]
   assert_contains "Habit Processing Rules" "$output"
+
+  run hx "$h" "$h" preload distill
+  [ "$(sections "$output")" = "LEARNINGS INDEX LOG PROCESSING OPERATIONS " ]
+  assert_contains '"gone"' "$output"
+  assert_contains '"sid":"sid-1"' "$output"
   assert_contains "Habit Operations Reference" "$output"
+
+  run hx "$h" "$h" preload watch
+  [ "$(echo "$output" | head -n 1)" = "ACTIVE" ]
+  refute_contains "===" "$output"
+
+  run hx "$h" "$h" preload nope
+  [ "$status" -ne 0 ]
 }
 
-@test "skill-preload emits LEARNINGS, TRIGGERS, INDEX in order for an index-carrying skill" {
-  local home="$BATS_TEST_TMPDIR/sp1"
-  mkdir -p "$home/.claude/habits"
-  run bash -c "HOME='$home' bash '$TOOLS' skill-preload habit sid1"
-  assert_contains "===LEARNINGS===" "$output"
-  assert_contains "===TRIGGERS===" "$output"
-  assert_contains "===INDEX===" "$output"
-  local l t i
-  l=$(echo "$output" | grep -n '^===LEARNINGS===$' | head -1 | cut -d: -f1)
-  t=$(echo "$output" | grep -n '^===TRIGGERS===$' | head -1 | cut -d: -f1)
-  i=$(echo "$output" | grep -n '^===INDEX===$' | head -1 | cut -d: -f1)
-  [ "$l" -lt "$t" ]
-  [ "$t" -lt "$i" ]
+@test "preload distill keeps the last 200 log lines" {
+  local h i
+  h=$(new_home pl2)
+  touch "$h/.claude/habits/.v3"
+  mkdir -p "$h/.claude/habits/log"
+  for i in $(seq 1 250); do
+    printf '{"ts":"2026-10-01T00:00:00Z","id":"h%s","project":"","sid":"","note":""}\n' "$i"
+  done > "$h/.claude/habits/log/2026-10.jsonl"
+  run hx "$h" "$h" preload distill
+  local log
+  log=$(echo "$output" | awk '/^===LOG===$/{f=1; next} /^===/{f=0} f && /^\{/')
+  [ "$(echo "$log" | wc -l | tr -d ' ')" -eq 200 ]
+  assert_contains '"id":"h250"' "$log"
+  refute_contains '"id":"h50"' "$log"
 }
 
-@test "skill-preload run emits no INDEX section" {
-  local home="$BATS_TEST_TMPDIR/sp2"
-  mkdir -p "$home/.claude/habits"
-  run bash -c "HOME='$home' bash '$TOOLS' skill-preload run sid1"
-  assert_contains "===LEARNINGS===" "$output"
-  assert_contains "===TRIGGERS===" "$output"
-  refute_contains "===INDEX===" "$output"
-}
-
-@test "skill-preload watch emits TRIGGERS only: watch is learning-free" {
-  local home="$BATS_TEST_TMPDIR/sp3"
-  mkdir -p "$home/.claude/habits"
-  run bash -c "HOME='$home' bash '$TOOLS' skill-preload watch sid1"
-  assert_contains "===TRIGGERS===" "$output"
-  refute_contains "===LEARNINGS===" "$output"
-  refute_contains "===INDEX===" "$output"
-}
-
-
-@test "install links the repo under a present tool's skills dir" {
-  local in="$BATS_TEST_TMPDIR/install"
-  mkdir -p "$in/.cursor"
-  HOME="$in" bash "$REPO_ROOT/install.sh" >/dev/null 2>&1 || true
-  [ -L "$in/.cursor/skills/habit-plugin" ]
-  [ -L "$in/.cursor/hooks/habit-hook.sh" ]
-  [ -f "$in/.cursor/skills/habit-plugin/skills/habit-shared/PROCESSING.md" ]
-}
-
-@test "read-transcript survives a malformed jsonl and still reads good files" {
-  local home="$BATS_TEST_TMPDIR/rs"
-  mkdir -p "$home/.claude/habits"
-  printf 'this is not json\n' > "$home/bad.jsonl"
-  echo '{"type":"user","message":{"content":"a valid user prompt with several words here"}}' > "$home/good.jsonl"
-  run bash -c "HOME='$home' bash '$TOOLS' read-transcript '$home/bad.jsonl'"
+@test "preload shows a failing section's error and still prints the rest" {
+  local h
+  h=$(new_home pl3)
+  touch "$h/.claude/habits/.v3"
+  _write_habit "$h/.claude/habits/locked.md" locked "[l]" "Unreadable." global false "L."
+  chmod 000 "$h/.claude/habits/locked.md"
+  run hx "$h" "$h" preload distill
+  chmod 644 "$h/.claude/habits/locked.md"
   [ "$status" -eq 0 ]
-  assert_contains "No session data yet." "$output"
-  run bash -c "HOME='$home' bash '$TOOLS' read-transcript '$home/good.jsonl'"
-  [ "$status" -eq 0 ]
-  assert_contains "valid user prompt" "$output"
+  [ "$(sections "$output")" = "LEARNINGS INDEX LOG PROCESSING OPERATIONS " ]
+  assert_contains "locked.md" "$(echo "$output" | awk '/^===INDEX===$/{f=1; next} /^===/{f=0} f')"
 }
 
-@test "distill-preload completes all sections even when project state is corrupt" {
-  local home="$BATS_TEST_TMPDIR/dpc"
-  local ws="$home/proj"
-  mkdir -p "$home/.claude/habits" "$ws/.claude/habits"
-  printf 'NOT JSON' > "$ws/.claude/habits/settings.local.json"
-  run bash -c "cd '$ws' && HOME='$home' bash '$TOOLS' distill-preload ''"
-  [ "$status" -eq 0 ]
-  assert_contains "===OPERATIONS===" "$output"
+# --- watch ---
+
+@test "watch off pauses capture until the expiry and watch on resumes it" {
+  local h before
+  h=$(new_home w1)
+  touch "$h/.claude/habits/.v3"
+  run hx "$h" "$h" watch
+  [ "$(echo "$output" | head -n 1)" = "ACTIVE" ]
+  before=$(date +%s)
+  run hx "$h" "$h" watch off 2
+  assert_contains "PAUSED until " "$output"
+  local until
+  until=$(cat "$h/.claude/habits/paused")
+  [ "$until" -ge $((before + 7200)) ]
+  [ "$until" -le $(( $(date +%s) + 7200 )) ]
+  [ -z "$(ls -A "$h/.claude/habits" | grep '^\.paused\.')" ]
+  run hx "$h" "$h" watch status
+  assert_contains "PAUSED until " "$(echo "$output" | head -n 1)"
+  printf '{"session_id":"w-1","cwd":"/w","prompt":"this prompt is not captured"}' | HOME="$h" bash "$TOOLS" capture
+  [ ! -e "$h/.claude/habits/inbox/claude-w-1.jsonl" ]
+  run hx "$h" "$h" watch on
+  [ "$output" = "ACTIVE" ]
+  [ ! -e "$h/.claude/habits/paused" ]
 }
+
+@test "watch off defaults to 8 hours and rejects a bad duration" {
+  local h before
+  h=$(new_home w2)
+  touch "$h/.claude/habits/.v3"
+  before=$(date +%s)
+  hx "$h" "$h" watch off >/dev/null
+  [ "$(cat "$h/.claude/habits/paused")" -ge $((before + 28800)) ]
+  for bad in 0 -1 abc 1.5; do
+    run hx "$h" "$h" watch off "$bad"
+    [ "$status" -ne 0 ]
+  done
+  run hx "$h" "$h" watch sideways
+  [ "$status" -ne 0 ]
+}
+
+@test "watch status counts waiting prompts and shows the newest capture" {
+  local h g
+  h=$(new_home w3)
+  g="$h/.claude/habits"
+  touch "$g/.v3"
+  run hx "$h" "$h" watch
+  [ "$output" = "$(printf 'ACTIVE\nInbox: 0 prompts waiting for distill\nLast capture: none')" ]
+  mkdir -p "$g/inbox/.claimed/r1" "$g/inbox/.done/r0"
+  printf '{"ts":"2026-10-01T10:00:00Z","prompt":"a"}\n{"ts":"2026-10-02T10:00:00Z","prompt":"b"}\n' > "$g/inbox/claude-a.jsonl"
+  printf '{"ts":"2026-10-03T10:00:00Z","prompt":"c"}\n' > "$g/inbox/.claimed/r1/claude-b.jsonl"
+  printf '{"ts":"2026-10-09T10:00:00Z","prompt":"d"}\n' > "$g/inbox/.done/r0/claude-c.jsonl"
+  run hx "$h" "$h" watch
+  assert_contains "Inbox: 3 prompts waiting for distill" "$output"
+  local epoch
+  epoch=$(jq -n '"2026-10-09T10:00:00Z" | fromdateiso8601')
+  assert_contains "Last capture: $(date -r "$epoch" '+%Y-%m-%d %H:%M' 2>/dev/null || date -d "@$epoch" '+%Y-%m-%d %H:%M')" "$output"
+}
+
+# --- learnings and environment ---
 
 @test "learnings store round-trips, merges global, and serves empty stores" {
   local home="$BATS_TEST_TMPDIR/lrn"
@@ -151,93 +160,6 @@ load test_helper
   printf '%s' '{"index":[],"meta":{},"log":[],"sessions":{},"observations":[]}' > "$home/.claude/habits/settings.local.json"
   run bash -c "HOME='$home' bash '$TOOLS' read-learnings run"
   [ -z "$output" ]
-}
-
-@test "prune-learnings de-duplicates a repeated target+note" {
-  local home="$BATS_TEST_TMPDIR/lrn-dup"
-  mkdir -p "$home/.claude/habits"
-  HOME="$home" bash "$TOOLS" write-learning run "scope overrides to the named module" "obs1" >/dev/null
-  HOME="$home" bash "$TOOLS" write-learning run "scope overrides to the named module" "obs3" >/dev/null
-  HOME="$home" bash "$TOOLS" prune-learnings >/dev/null
-  local n
-  n=$(jq '[.learnings[] | select(.target=="run" and .note=="scope overrides to the named module")] | length' "$home/.claude/habits/settings.local.json")
-  [ "$n" -eq 1 ]
-}
-
-@test "session-end promotes a counted session to pending and drops the live session" {
-  local home="$BATS_TEST_TMPDIR/se"
-  mkdir -p "$home/.claude/habits"
-  local tp="$home/t.jsonl"
-  echo '{"type":"user","message":{"content":"a real prompt with several words"}}' > "$tp"
-  HOME="$home" bash "$TOOLS" session-init sess-A >/dev/null
-  HOME="$home" bash "$TOOLS" prompt-tick sess-A "$tp" "a real prompt with several words" >/dev/null
-  HOME="$home" bash "$TOOLS" session-end sess-A >/dev/null
-
-  local state="$home/.claude/habits/settings.local.json"
-  [ "$(jq '[.meta.pending_sessions[] | select(.session_id=="sess-A")] | length' "$state")" -eq 1 ]
-  [ "$(jq '.sessions["sess-A"] // "gone"' "$state")" = '"gone"' ]
-}
-
-@test "watch stop pauses prompt counting until watch start resumes it" {
-  local home="$BATS_TEST_TMPDIR/wp"
-  mkdir -p "$home/.claude/habits"
-  HOME="$home" bash "$TOOLS" session-init sess-B >/dev/null
-
-  HOME="$home" bash "$TOOLS" watch stop sess-B >/dev/null
-  HOME="$home" bash "$TOOLS" prompt-tick sess-B "" "a prompt with plenty of words here" >/dev/null
-  run bash -c "HOME='$home' bash '$TOOLS' read-prompt-count sess-B"
-  [ "$output" = "0" ]
-
-  HOME="$home" bash "$TOOLS" watch start sess-B >/dev/null
-  HOME="$home" bash "$TOOLS" prompt-tick sess-B "" "another prompt with plenty of words" >/dev/null
-  run bash -c "HOME='$home' bash '$TOOLS' read-prompt-count sess-B"
-  [ "$output" = "1" ]
-}
-
-@test "prune-learnings keeps at most LEARN_RETAIN entries" {
-  local home="$BATS_TEST_TMPDIR/lrn-bound"
-  mkdir -p "$home/.claude/habits"
-  for i in $(seq 1 45); do
-    HOME="$home" bash "$TOOLS" write-learning run "distinct note number $i" "obs$i" >/dev/null
-  done
-  HOME="$home" bash "$TOOLS" prune-learnings >/dev/null
-  [ "$(jq '.learnings | length' "$home/.claude/habits/settings.local.json")" -eq 40 ]
-}
-
-@test "self-heal rebuilds the index from the habit .md files on disk" {
-  local home="$BATS_TEST_TMPDIR/sh"
-  local dir="$home/.claude/habits"
-  mkdir -p "$dir"
-  cat > "$dir/one.md" << 'MD'
----
-id: one
-tags: [x]
-description: First habit.
-scope: global
-archived: false
----
-
-## Instruction
-A.
-MD
-  cat > "$dir/two.md" << 'MD'
----
-id: two
-tags: [y]
-description: Second habit.
-scope: global
-archived: true
----
-
-## Instruction
-B.
-MD
-  printf '%s' '{"index":[],"meta":{},"log":[],"sessions":{},"observations":[]}' > "$dir/settings.local.json"
-
-  run bash -c "HOME='$home' bash '$TOOLS' self-heal global"
-  assert_contains "rebuilt index with 2 entries" "$output"
-  [ "$(jq '.index | length' "$dir/settings.local.json")" -eq 2 ]
-  [ "$(jq -r '.index[] | select(.id=="two") | .archived' "$dir/settings.local.json")" = "true" ]
 }
 
 @test "env-context detects a habit checkout vs an installed copy" {

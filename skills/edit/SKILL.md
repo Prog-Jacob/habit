@@ -1,55 +1,57 @@
 ---
 name: habit-edit
-description: "Use when the user wants to create a new habit or update an existing one through natural language. Triggers on: saving a habit, creating a workflow, editing a prompt, defining a reusable pattern."
+description: "Use when the user wants to create, update, or delete a habit through natural language. Triggers on: saving a habit, creating a workflow, editing a prompt, defining a reusable pattern, removing a habit."
 argument-hint: "<id> [changes or description]"
 allowed-tools: Bash(bash:*)
 disable-model-invocation: true
 ---
 
-# Habit Edit: Create or Update
+# Habit Edit: Create, Update, or Delete
 
 ## Preload
 
-!`bash ${CLAUDE_PLUGIN_ROOT}/bin/habit-tools.sh skill-preload edit ${CLAUDE_SESSION_ID}`
-
-Run this Setup block once and reuse the values below:
+Run this once before anything else:
 
 ```bash
-HABIT_SID_FILE=$(ls -t "$HOME/.claude/habits/sessions.d/"* 2>/dev/null | head -1)
-source "${HABIT_SID_FILE:-$HOME/.claude/habits/current}" 2>/dev/null
-HABIT_BIN="${HABIT_BIN:-$(command -v habit-tools.sh || echo "${CLAUDE_PLUGIN_ROOT:+$CLAUDE_PLUGIN_ROOT/bin/habit-tools.sh}")}"
-[ -f "${HABIT_BIN:-}" ] || echo "HABIT_UNAVAILABLE: habit is not wired on this host."
+bash ~/.claude/habits/bin/habit-tools.sh preload edit
 ```
 
-If it printed `HABIT_UNAVAILABLE`, tell the user habit is not installed or its hooks are not wired, then stop. Otherwise, if no preload output appears above (hosts without harness-time injection, e.g. Cursor), run `bash "$HABIT_BIN" skill-preload edit "$HABIT_SID"` once.
+If the command is missing, tell the user habit's hooks have not run yet and to start a new session, then stop.
 
-The output has delimited sections: `===LEARNINGS===` (apply each note silently as standing guidance for this skill when you reach the step it bears on; never print, quote, summarize, or mention them to the user), `===TRIGGERS===` (show the message only if non-empty).
+The output has two sections: `===LEARNINGS===` (standing guidance for this skill: apply each note silently when you reach the step it bears on; never print, quote, summarize, or mention them) and `===PROCESSING===` (the processing rules).
 
-## Load existing habit and processing rules
+## Load the habit
 
-Parse the user's message: first token is the id (lowercase, alphanumeric and hyphens, max 40 chars), the rest is the changes or description. Load both:
+The first token of the message is the id (lowercase letters, digits, and hyphens, at most 40 characters). The rest is the change or description. Load it:
 
 ```bash
-bash "$HABIT_BIN" read-habit "<id>"
-bash "$HABIT_BIN" read-shared PROCESSING.md
+bash ~/.claude/habits/bin/habit-tools.sh read-habit <id>
 ```
 
 ## Instructions
 
 Output: the confirmation message or the question to the user.
 
-1. If the loaded content starts with `SCOPE:<scope>`, the habit exists. If `NOT_FOUND`, it is new.
+1. Output starting with `SCOPE:<scope>` means the habit exists. `NOT_FOUND` means it is new.
 
-| Exists? | Input? | Action                                      |
-| ------- | ------ | ------------------------------------------- |
-| Yes     | Yes    | Apply changes to existing habit, write back |
-| Yes     | No     | Show current state, ask what to change      |
-| No      | Yes    | Create new habit from description           |
-| No      | No     | Ask what this habit should do and stop      |
+| Exists? | Input?          | Action                                      |
+| ------- | --------------- | ------------------------------------------- |
+| Yes     | Asks to delete  | Delete it                                   |
+| Yes     | Yes             | Apply changes to existing habit, write back |
+| Yes     | No              | Show current state, ask what to change      |
+| No      | Yes             | Create new habit from description           |
+| No      | No              | Ask what this habit should do and stop      |
 
-2. If the action is "ask", ask and stop. Otherwise apply the loaded Processing Rules. Edit in the scope where it was found. To change scope, the user must explicitly request it.
-3. Write:
+2. If the action is "ask", ask and stop. Otherwise apply the processing rules. Edit in the scope where the habit was found. Change scope only when the user asks: write it in the new scope, then delete the old copy.
+3. Keep the id. Users run habits by id, so never rename one silently. Rename only when the user asks, by writing the new id and deleting the old one, and say so.
+4. On an update, keep `created` and any `last_executed` line exactly as they are, and set `updated` to now. Never add `last_executed`.
+5. Write:
    ```bash
-   bash "$HABIT_BIN" write-habit <scope> <id> '<frontmatter+body>'
+   bash ~/.claude/habits/bin/habit-tools.sh write-habit <scope> <id> '<frontmatter+body>'
    ```
    Confirm: "Created habit [id]. Tags: [tags]. [description]. ([scope])." or "Updated habit [id]: what changed."
+6. Delete:
+   ```bash
+   bash ~/.claude/habits/bin/habit-tools.sh delete-habit <scope> <id>
+   ```
+   Confirm: "Deleted habit [id] ([scope])."

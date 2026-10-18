@@ -1,6 +1,6 @@
 # Habit Processing Rules
 
-Invoke every command as `bash "$HABIT_BIN" <subcommand> ...`. All habit commands that create, modify, or inspect habits follow these rules. Do not announce internal operations to the user. Show only the final result.
+Invoke every command as `bash ~/.claude/habits/bin/habit-tools.sh <command> ...`. All habit commands that create, modify, or inspect habits follow these rules. Do not announce internal operations to the user. Show only the final result.
 
 ## 1. Interpretation
 
@@ -25,7 +25,7 @@ A prompt is **reusable** if it:
 
 A prompt is **one-off** if it:
 
-- References specific files, errors, or context only meaningful in this session
+- References specific files, errors, or context only meaningful in that moment
 - Is a question or conversational reply
 - Is a one-time action ("fix the typo on line 42")
 - Is a tool bug or temporary issue unrelated to how the user works
@@ -35,17 +35,17 @@ A prompt is **one-off** if it:
 Compare new candidate against the preloaded index (descriptions + tags) by intent, not wording. Only load full content via `read-habit <id>` when two habits look close enough that the description alone cannot distinguish them.
 
 - **Skip:** Candidate and existing habit would produce the same agent behavior. Only wording differs. Note in the summary that it's already covered.
-- **Merge:** Candidate adds steps or context the existing habit lacks, but they target the same workflow. Preserve intent from both. Update `updated` timestamp.
+- **Merge:** Candidate adds steps or context the existing habit lacks, but they target the same workflow. Preserve intent from both. Keep the id. Update `updated` timestamp.
 - **Create new:** Candidate targets a different workflow, even if it shares the same domain.
 
 ## 4. Override Patterns
 
-From the execution log: group by id, collect overrides, normalize (lowercase, trim). **3+ similar = pattern:**
+From the usage log: group by id, collect the non-empty notes (each is an override the user gave when running the habit), normalize (lowercase, trim). **3+ similar = pattern:**
 
 - Scope-narrowing → create variant (e.g., `fix-types-auth`).
 - Behavior-adding → update base habit.
 
 ## 5. Scope Detection
 
-- References relative paths, project scripts, or project config → `project` → `.claude/habits/`
+- References relative paths, project scripts, or project config → `project` (the project the prompt came from)
 - Generic → `global` → `~/.claude/habits/`
