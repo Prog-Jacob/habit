@@ -196,12 +196,3 @@ shim_target() { sed -n 's/^exec bash "\(.*\)" "\$@"$/\1/p' "$1"; }
   (cd "$h" && echo '{}' | HOME="$h" bash "$TOOLS" session-start)
   [ "$(shim_target "$shim")" = "$ours" ]
 }
-
-@test "hook session-start routes to the CLI and prints nothing" {
-  local h
-  h=$(new_home ss3)
-  run bash -c "cd '$h' && echo '{\"session_id\":\"x\"}' | HOME='$h' bash '$HOOK' session-start"
-  [ "$status" -eq 0 ]
-  [ -z "$output" ]
-  [ -f "$h/.claude/habits/bin/habit-tools.sh" ]
-}

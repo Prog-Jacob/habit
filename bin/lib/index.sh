@@ -12,12 +12,14 @@ _frontmatter_rows() {
       print s "\037" file "\037" stem "\037" v["id"] "\037" v["tags"] "\037" v["description"] "\037" \
         v["created"] "\037" v["updated"] "\037" v["archived"] "\037" v["last_executed"] "\037" v["kind"] "\037" body
     }
-    FNR == 1 { emit(); file = FILENAME; n = 0; body = ""; split("", v) }
+    function start(f) { emit(); file = f; seen[f] = 1; n = 0; body = ""; split("", v) }
+    FNR == 1 { start(FILENAME) }
     { sub(/\r$/, "") }
     n >= 2 { if (v["kind"] == "rule") body = body $0 "\035"; next }
     $0 == "---" { n++; next }
     n == 1 { k = $0; sub(/:.*/, "", k); val = $0; sub(/^[^:]*:/, "", val); sub(/^ +/, "", val); v[k] = val }
-    END { emit() }
+    # An empty file has no first line; emit it with no fields so it reads as invalid.
+    END { for (i = 1; i < ARGC; i++) if (!(ARGV[i] in seen)) start(ARGV[i]); emit() }
   ' "$@"
 }
 

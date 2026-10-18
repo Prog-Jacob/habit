@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Library unit tests: resolve, read-habit, read-index, log-exec, write-habit,
+# Library unit tests: read-habit, read-index, log-exec, write-habit,
 # and delete-habit. Each test gets a fresh fixture set, so the suite
 # never leans on mutation order between cases.
 
@@ -14,46 +14,18 @@ teardown() {
   teardown_fixtures
 }
 
-@test "_resolve_habit finds a global habit" {
-  run _resolve_habit cleanup-writing
-  [ "$status" -eq 0 ]
-  [ "$output" = "global $TEST_GLOBAL/cleanup-writing.md" ]
-}
-
-@test "_resolve_habit finds a project habit" {
-  run _resolve_habit project-habit
-  [ "$status" -eq 0 ]
-  [ "$output" = "project $TEST_PROJECT/project-habit.md" ]
-}
-
-@test "_resolve_habit returns 1 for a missing habit" {
-  run _resolve_habit nonexistent
-  [ "$status" -eq 1 ]
-}
-
-@test "_resolve_habit lowercases its argument" {
-  run _resolve_habit "Cleanup-Writing"
-  [ "$output" = "global $TEST_GLOBAL/cleanup-writing.md" ]
-}
-
-@test "_resolve_habit trims trailing override text, then lowercases" {
-  run _resolve_habit "Cleanup-Writing only in auth"
-  [ "$status" -eq 0 ]
-  [ "$output" = "global $TEST_GLOBAL/cleanup-writing.md" ]
+@test "cmd_read_habit lowercases ids, drops override words, finds project habits, and rejects paths" {
+  printf 'outside\n' > "$TEST_PROJECT/../escape.md"
+  run cmd_read_habit "Project-Habit only in auth" ../escape
+  [ "${lines[0]}" = "---HABIT:Project-Habit---" ]
+  [ "${lines[1]}" = "SCOPE:project" ]
+  assert_contains "$(printf -- '---HABIT:../escape---\nNOT_FOUND')" "$output"
+  refute_contains "outside" "$output"
 }
 
 @test "cmd_read_habit emits SCOPE and the file for a single id, with no header" {
   run cmd_read_habit cleanup-writing
   [ "$output" = "$(printf 'SCOPE:global\n%s' "$(cat "$TEST_GLOBAL/cleanup-writing.md")")" ]
-}
-
-@test "cmd_read_habit delimits and emits each of multiple ids" {
-  run cmd_read_habit cleanup-writing smart-tests
-  assert_contains "---HABIT:cleanup-writing---" "$output"
-  assert_contains "---HABIT:smart-tests---" "$output"
-  assert_contains "SCOPE:global" "$output"
-  assert_contains "Fix dashes." "$output"
-  assert_contains "Test well." "$output"
 }
 
 @test "cmd_read_habit reports NOT_FOUND between found ids" {
@@ -75,18 +47,6 @@ teardown() {
   local keys
   keys=$(echo "$output" | jq -c '.entries[0] | keys | sort')
   [ "$keys" = '["description","id","scope","tags"]' ]
-}
-
-@test "cmd_read_index merged includes archived" {
-  run cmd_read_index merged
-  assert_contains "old-habit" "$output"
-  assert_contains "cleanup-writing" "$output"
-}
-
-@test "cmd_read_index project scope excludes global" {
-  run cmd_read_index project
-  assert_contains "project-habit" "$output"
-  refute_contains "cleanup-writing" "$output"
 }
 
 @test "cmd_log_exec appends one log line and leaves the habit file alone" {

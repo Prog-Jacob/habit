@@ -4,6 +4,7 @@
 _resolve_habit() {
   local id="${1%% *}" pdir
   id=$(printf '%s' "$id" | tr '[:upper:]' '[:lower:]')
+  [[ "$id" =~ ^[a-z0-9-]{1,40}$ ]] || return 1
   pdir=$(project_dir) || pdir=""
   if [ -n "$pdir" ] && [ -f "$pdir/$id.md" ]; then
     echo "project $pdir/$id.md"
@@ -22,7 +23,7 @@ cmd_read_habit() {
   [ $# -eq 0 ] && { echo "NOT_FOUND"; exit 0; }
   local id resolved
   for id in "$@"; do
-    [ $# -eq 1 ] || echo "---HABIT:$id---"
+    [ $# -eq 1 ] || echo "---HABIT:${id%% *}---"
     if resolved=$(_resolve_habit "$id"); then
       echo "SCOPE:${resolved%% *}"
       cat "${resolved#* }"

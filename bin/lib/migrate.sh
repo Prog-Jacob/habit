@@ -25,22 +25,17 @@ _migrate_learnings() {
   [ -z "$lines" ] || printf '%s\n' "$lines" >> "$GLOBAL_DIR/learnings.jsonl"
 }
 
-# .v3 is written last, so a failed learnings copy is retried on the next call.
-# Habit files need no conversion: the index falls back to their frontmatter
-# last_executed, and the v2 log held no signal worth keeping (B14).
-_migrate_all() {
-  _migrate_learnings && echo 3 > "$GLOBAL_DIR/.v3"
-}
-
 # migrate_if_needed [bg]: migrate once when .v3 is missing, then backfill.
-# Returns 0 silently when another process holds the lock.
+# Returns 0 silently when another process holds the lock. .v3 is written last,
+# so a failed learnings copy is retried on the next call. Habit files need no
+# conversion: the index falls back to their frontmatter last_executed, and the
+# v2 log held no signal worth keeping.
 migrate_if_needed() {
   local did=""
   [ -f "$GLOBAL_DIR/.v3" ] && return 0
   _migrate_lock || return 0
-  if [ ! -f "$GLOBAL_DIR/.v3" ]; then
-    _migrate_all || true
-    [ -f "$GLOBAL_DIR/.v3" ] && did=1
+  if [ ! -f "$GLOBAL_DIR/.v3" ] && _migrate_learnings && echo 3 > "$GLOBAL_DIR/.v3"; then
+    did=1
   fi
   _migrate_unlock
   [ -n "$did" ] || return 0

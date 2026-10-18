@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # shellcheck ships on the runner image; make lint is the single source of
-      # the lint command (see the Makefile for the -x / SC1091 rationale).
+      # the lint command.
       - name: ShellCheck
         run: make lint
 

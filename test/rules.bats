@@ -109,9 +109,10 @@ kind_md() {
   assert_contains "Rule crlf-long body is 601 characters" "$output"
 }
 
-@test "read-index active carries kind when the frontmatter has it" {
+@test "read-index carries kind when the frontmatter has it, in both modes" {
   hab "$G/a-rule.md" a-rule rule "Rule."
   hab "$G/a-proc.md" a-proc "" "Steps."
+  [ "$(hx "$H" "$H" read-index merged | jq -c '[.entries[] | .kind]')" = '[null,"rule"]' ]
   run hx "$H" "$H" read-index merged active
   [ "$(echo "$output" | jq -c '.entries[] | select(.id=="a-rule") | keys')" = '["description","id","kind","scope","tags"]' ]
   [ "$(echo "$output" | jq -r '.entries[] | select(.id=="a-rule") | .kind')" = rule ]

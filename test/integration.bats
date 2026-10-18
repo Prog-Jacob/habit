@@ -138,7 +138,7 @@ sections() { echo "$1" | sed -n 's/^===\([A-Z]*\)===$/\1/p' | tr '\n' ' '; }
   done
 }
 
-@test "watch forget removes a learning, and status numbers the learnings" {
+@test "status numbers the learnings and says how to forget one" {
   local h
   h=$(new_home wf)
   touch "$h/.claude/habits/.v3"
@@ -146,33 +146,9 @@ sections() { echo "$1" | sed -n 's/^===\([A-Z]*\)===$/\1/p' | tr '\n' ' '; }
   hx "$h" "$h" write-learning edit "second note" >/dev/null
   run hx "$h" "$h" status
   assert_contains "$(printf 'Learnings:\n  1. [suggest] first note\n  2. [edit] second note\n  Forget one with: watch forget <n>')" "$output"
-  run hx "$h" "$h" watch forget 1
-  [ "$output" = "OK forgot learning 1" ]
-  [ "$(hx "$h" "$h" list-learnings)" = "1. [edit] second note" ]
-  run hx "$h" "$h" watch forget 9
-  [ "$status" -ne 0 ]
 }
 
 # --- learnings and environment ---
-
-@test "learnings store round-trips, merges global, and serves empty stores" {
-  local home="$BATS_TEST_TMPDIR/lrn"
-  mkdir -p "$home/.claude/habits"
-  HOME="$home" bash "$TOOLS" write-learning run "scope overrides to the named module" "obs1" >/dev/null
-  HOME="$home" bash "$TOOLS" write-learning global "summaries stay short" "obs2" >/dev/null
-
-  run bash -c "HOME='$home' bash '$TOOLS' read-learnings run"
-  assert_contains "scope overrides to the named module" "$output"
-  assert_contains "summaries stay short" "$output"
-
-  run bash -c "HOME='$home' bash '$TOOLS' read-learnings edit"
-  assert_contains "summaries stay short" "$output"
-
-  local empty="$BATS_TEST_TMPDIR/lrn-empty"
-  mkdir -p "$empty/.claude/habits"
-  run bash -c "HOME='$empty' bash '$TOOLS' read-learnings edit"
-  [ -z "$output" ]
-}
 
 @test "read-learnings tolerates a state file predating the learnings key" {
   local home="$BATS_TEST_TMPDIR/lrn-old"

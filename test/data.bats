@@ -9,6 +9,8 @@ load test_helper
 @test "learnings append, list with numbers, and fold forget tombstones on read" {
   local h
   h=$(new_home lrn)
+  run hx "$h" "$h" read-learnings run
+  [ "$status" -eq 0 ] && [ -z "$output" ]
   hx "$h" "$h" write-learning run "scope overrides to the module" o1 >/dev/null
   hx "$h" "$h" write-learning global "summaries stay short" o2 >/dev/null
   hx "$h" "$h" write-learning edit "keep the id stable" o3 >/dev/null
@@ -155,10 +157,12 @@ resolve() { # resolve <home> <start>
   printf -- '---\nid: \ndescription: No id.\n---\n' > "$TEST_GLOBAL/-.md"
   printf -- '---\nid: other\ndescription: Wrong id.\n---\n' > "$TEST_GLOBAL/renamed.md"
   printf -- '---\nid: nodesc\n---\n' > "$TEST_PROJECT/nodesc.md"
+  : > "$TEST_GLOBAL/empty.md"
   run cmd_read_index merged
   [ "$(echo "$output" | jq -c '[.entries[].id]')" = '["cleanup-writing","old-habit","project-habit","smart-tests"]' ]
   run cmd_invalid_habits
-  [ "$(echo "$output" | wc -l | tr -d ' ')" -eq 3 ]
+  [ "$(echo "$output" | wc -l | tr -d ' ')" -eq 4 ]
+  assert_contains "$TEST_GLOBAL/empty.md: missing id" "$output"
   assert_contains "$TEST_GLOBAL/-.md: missing id" "$output"
   assert_contains "$TEST_GLOBAL/renamed.md: id other does not match the filename" "$output"
   assert_contains "$TEST_PROJECT/nodesc.md: missing description" "$output"
@@ -183,16 +187,6 @@ JSONL
   [ "$(echo "$output" | jq -r '.entries[] | select(.id=="project-habit") | .last_executed')" = "2026-09-05T00:00:00Z" ]
   [ "$(echo "$output" | jq -r '.entries[] | select(.id=="smart-tests") | .last_executed')" = "2026-01-01T00:00:00Z" ]
   [ "$(echo "$output" | jq -r '.entries[] | select(.id=="old-habit") | has("last_executed")')" = "false" ]
-  teardown_fixtures
-}
-
-@test "the index carries kind when the frontmatter has it" {
-  seed_fixtures
-  source_libs
-  printf -- '---\nid: ruled\ndescription: A rule.\nkind: rule\n---\nBody.\n' > "$TEST_GLOBAL/ruled.md"
-  run cmd_read_index merged
-  [ "$(echo "$output" | jq -r '.entries[] | select(.id=="ruled") | .kind')" = "rule" ]
-  [ "$(echo "$output" | jq -r '.entries[] | select(.id=="smart-tests") | has("kind")')" = "false" ]
   teardown_fixtures
 }
 

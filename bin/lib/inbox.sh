@@ -46,6 +46,7 @@ cmd_claim() {
   done < <(_claim_candidates)
   [ "$moved" -gt 0 ] || { echo "EMPTY"; return 0; }
   for f in "$inbox"/.claimed/*/; do rmdir "$f" 2>/dev/null || true; done
+  # A capture that opened a file before the move still appends to it; let it land.
   sleep 1
   local lines map dirs=("$GLOBAL_DIR") root left=0
   if root=$(project_root); then dirs+=("$root/.claude/habits"); fi
