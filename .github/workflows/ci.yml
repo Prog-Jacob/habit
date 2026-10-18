@@ -14,11 +14,57 @@ jobs:
       - name: ShellCheck
         run: make lint
 
-  test:
+  # bash 5, GNU coreutils, mawk, jq 1.7.
+  test-ubuntu:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install bats and jq
-        run: sudo apt-get update && sudo apt-get install -y bats jq
+      - name: Install bats-core and jq
+        run: sudo apt-get update && sudo apt-get install -y jq && sudo npm install -g bats@1.11.1
       - name: Run tests
         run: make test
+
+  # jq 1.6 (the oldest jq habit supports), as a normal user and as root, the
+  # way devcontainers often run.
+  test-debian-jq16:
+    runs-on: ubuntu-latest
+    container: debian:12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install bats-core, jq and git
+        run: |
+          apt-get update && apt-get install -y jq git make
+          git clone --depth 1 --branch v1.11.1 https://github.com/bats-core/bats-core.git /tmp/bats-core
+          /tmp/bats-core/install.sh /usr/local
+          jq --version | grep -qx 'jq-1.6'
+      - name: Run tests as a normal user
+        run: |
+          useradd -m u
+          cp -r "$GITHUB_WORKSPACE" /home/u/work && chown -R u /home/u/work
+          su u -c 'cd /home/u/work && make test'
+      - name: Run tests as root
+        run: make test
+
+  # macOS ships bash 3.2 as /bin/bash; put it first on PATH so `bash` in the
+  # tools and tests resolves to it, not to a newer Homebrew bash. Run once with
+  # Homebrew's jq and once with the jq macOS ships, when the image has it.
+  test-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install bats and jq
+        run: brew install bats-core jq
+      - name: Pin bash 3.2
+        run: |
+          mkdir -p "$RUNNER_TEMP/bash32"
+          ln -s /bin/bash "$RUNNER_TEMP/bash32/bash"
+          echo "$RUNNER_TEMP/bash32" >> "$GITHUB_PATH"
+      - name: Run tests with Homebrew jq
+        run: |
+          bash --version | head -1 | grep -q 'version 3\.2'
+          make test
+      - name: Run tests with the system jq
+        run: |
+          [ -x /usr/bin/jq ] || { echo "no system jq on this image"; exit 0; }
+          mkdir -p "$RUNNER_TEMP/sysjq" && ln -sf /usr/bin/jq "$RUNNER_TEMP/sysjq/jq"
+          PATH="$RUNNER_TEMP/sysjq:$PATH" make test
